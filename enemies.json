@@ -1,0 +1,24 @@
+{
+    "slime": {
+        "name": "史莱姆",
+        "stats": {
+            "hp": 20,
+            "defense": 2,
+            "magic_resist": 0,
+            "attack": 5,
+            "attack_speed": 1.0
+        },
+        "exp_reward": 50
+    },
+    "goblin": {
+        "name": "哥布林",
+        "stats": {
+            "hp": 80,
+            "defense": 4,
+            "magic_resist": 2,
+            "attack": 8,
+            "attack_speed": 1.2
+        },
+        "exp_reward": 80
+    }
+}

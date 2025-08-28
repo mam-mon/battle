@@ -1,0 +1,27 @@
+{
+    "1": {
+        "type": "story",
+        "text": [
+            { "speaker": "旁白", "line": "你睁开眼睛，发现自己身处一片宁静的森林之中。" },
+            { "speaker": "旁白", "line": "阳光透过树叶的缝隙洒下，空气中弥漫着青草的气息。" },
+            { "speaker": "旁白", "line": "突然，一阵“咕叽咕叽”的声音传来，一只果冻状的生物出现在你面前！" }
+        ],
+        "next": "2"
+    },
+    "2": {
+        "type": "combat",
+        "enemy_id": "slime",
+        "next_win": "3",
+        "next_lose": "game_over"
+    },
+    "3": {
+        "type": "story",
+        "text": [
+            { "speaker": "旁白", "line": "你轻松地战胜了史莱姆。" },
+            { "speaker": "你", "line": "看来这里的生物并没有想象中那么强大。" },
+            { "speaker": "你", "line": "我决定继续深入森林，探索这个未知的世界..." },
+            { "speaker": "旁白", "line": "(未完待续)" }
+        ],
+        "next": "quit"
+    }
+}
