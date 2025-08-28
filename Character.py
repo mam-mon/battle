@@ -91,20 +91,39 @@ class Character:
             eqs.extend(eq_list)
         return eqs
 
-    def equip(self, eq):
-        slot = eq.slot
+    def equip(self, eq_to_equip):
+        """装备一件物品，如果插槽已满，则返回被替换的物品"""
+        slot = eq_to_equip.slot
         if slot not in self.SLOT_CAPACITY:
             raise ValueError(f"未知插槽：{slot}")
+        
+        # 如果插槽已满
         if len(self.slots[slot]) >= self.SLOT_CAPACITY[slot]:
-            raise ValueError(f"{slot} 插槽已满")
-        self.slots[slot].append(eq)
+            # 暂时只处理单容量插槽的替换
+            if self.SLOT_CAPACITY[slot] == 1:
+                unequipped_item = self.slots[slot][0]
+                self.slots[slot][0] = eq_to_equip
+                return unequipped_item
+            else:
+                raise ValueError(f"{slot} 插槽已满")
+        
+        # 如果插槽未满
+        self.slots[slot].append(eq_to_equip)
+        return None # 表示没有物品被替换
 
-    def unequip(self, slot, eq=None):
-        if eq:
-            self.slots[slot].remove(eq)
-        else:
-            self.slots[slot].clear()
+    def unequip(self, eq_to_unequip):
+        """从身上卸下一件指定的装备"""
+        slot = eq_to_unequip.slot
+        if eq_to_unequip in self.slots[slot]:
+            self.slots[slot].remove(eq_to_unequip)
+            return eq_to_unequip
+        return None
 
+    def recalculate_stats(self):
+        """根据当前装备重新计算所有属性"""
+        # (这个方法在真正的游戏中非常重要，用于更新因装备变化带来的属性增减)
+        # (为简化起见，我们暂时省略具体实现，但保留这个接口)
+        print("重新计算角色属性...")
     def heal(self, amount: float) -> float:
         """
         给自己回血：

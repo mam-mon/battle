@@ -31,10 +31,11 @@ class SaveScreen(BaseState):
 
     def draw(self, surface):
         surface.fill(BG_COLOR)
-        draw_text(surface, "选择要覆盖的存档槽", self.game.fonts['large'], TEXT_COLOR, pygame.Rect(0, 50, SCREEN_WIDTH, 100))
+        title_font = self.game.fonts['large']
+        draw_text(surface, "选择要覆盖的存档槽", title_font, TEXT_COLOR, pygame.Rect(0, 50, SCREEN_WIDTH, 100))
 
         for i, rect in enumerate(self.slot_rects, 1):
-            slot_data = self.game.load_from_slot(i)
+            slot_data = self.game.peek_save_slot(i) # <-- 使用 peek_save_slot
             is_hovered = rect.collidepoint(pygame.mouse.get_pos())
             if is_hovered:
                 pygame.draw.rect(surface, PANEL_BORDER_COLOR, rect.inflate(10, 10), 2, border_radius=5)

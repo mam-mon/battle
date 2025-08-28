@@ -3,21 +3,27 @@ import pygame
 from states.base import BaseState
 from states.saving import SaveScreen
 from states.loading import LoadScreen
-from states.combat import CombatScreen
 from ui import draw_text
 from settings import *
 
 class StoryScreen(BaseState):
+    # ... (__init__, _initialize_story, update, draw 方法保持不变) ...
+    # ...
     def __init__(self, game):
         super().__init__(game)
+        # 为按钮定义一个固定位置
+        button_w, button_h = 120, 35
+        padding = 10
+        save_rect = pygame.Rect(SCREEN_WIDTH - padding - button_w, SCREEN_HEIGHT - padding - button_h, button_w, button_h)
+        load_rect = pygame.Rect(save_rect.left - padding - button_w, save_rect.top, button_w, button_h)
         self.dialogue_buttons = {
-            "save": pygame.Rect(SCREEN_WIDTH - 130, SCREEN_HEIGHT - 45, 120, 35),
-            "load": pygame.Rect(SCREEN_WIDTH - 260, SCREEN_HEIGHT - 45, 120, 35)
+            "save": save_rect,
+            "load": load_rect
         }
         self._initialize_story()
 
     def _initialize_story(self):
-        start_index = getattr(self.game, "loaded_dialogue_index", 0)
+        start_index = getattr(self.game, "loaded_dialog-ue_index", 0)
         self.dialogue_index = start_index
         self.displayed_chars = 0
         self.typing_complete = False
@@ -30,14 +36,19 @@ class StoryScreen(BaseState):
             now = pygame.time.get_ticks()
             if now - self.last_char_time > self.typewriter_speed:
                 stage_data = self.game.story_data.get(self.game.current_stage, {})
-                line = stage_data.get("text", [{}])[self.dialogue_index].get("line", "")
+                dialogue_list = stage_data.get("text", [])
+                if not dialogue_list or self.dialogue_index >= len(dialogue_list):
+                    self.typing_complete = True
+                    return
+                line = dialogue_list[self.dialogue_index].get("line", "")
                 if self.displayed_chars < len(line):
                     self.displayed_chars += 1
                     self.last_char_time = now
                 else:
                     self.typing_complete = True
-
+    
     def handle_event(self, event):
+        # 鼠标点击事件
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = event.pos
             if self.dialogue_buttons["save"].collidepoint(mouse_pos):
@@ -48,6 +59,7 @@ class StoryScreen(BaseState):
                 return
             self._advance_dialogue()
         
+        # 键盘按键事件
         if event.type == pygame.KEYDOWN:
             if event.key in [pygame.K_RETURN, pygame.K_SPACE]:
                 self._advance_dialogue()
@@ -55,20 +67,27 @@ class StoryScreen(BaseState):
                 self.game.state_stack.append(SaveScreen(self.game))
             elif event.key == pygame.K_l:
                 self.game.state_stack.append(LoadScreen(self.game))
+            elif event.key == pygame.K_b: # <--- 新增分支
+                from states.backpack import BackpackScreen
+                self.game.state_stack.append(BackpackScreen(self.game))
     
     def _advance_dialogue(self):
+        from states.combat import CombatScreen # <-- Import 移至此处
+        from states.title import TitleScreen # <-- Import 移至此处
+        
+        stage_data = self.game.story_data[self.game.current_stage]
+        dialogue_list = stage_data.get("text", [])
+
         if not self.typing_complete:
             self.typing_complete = True
-            stage_data = self.game.story_data.get(self.game.current_stage, {})
-            line = stage_data.get("text", [{}])[self.dialogue_index].get("line", "")
+            line = dialogue_list[self.dialogue_index].get("line", "")
             self.displayed_chars = len(line)
         else:
             self.dialogue_index += 1
-            stage_data = self.game.story_data[self.game.current_stage]
-            if self.dialogue_index >= len(stage_data.get("text", [])):
+            if self.dialogue_index >= len(dialogue_list):
                 self.game.current_stage = stage_data["next"]
                 if self.game.current_stage == "quit":
-                    self.game.running = False
+                    self.game.state_stack = [TitleScreen(self.game)]
                     return
                 next_stage_data = self.game.story_data.get(self.game.current_stage, {})
                 if next_stage_data.get("type") == "combat":
@@ -82,13 +101,19 @@ class StoryScreen(BaseState):
                 self.last_char_time = 0
 
     def draw(self, surface):
-        surface.fill(BG_COLOR) # 清屏
+        surface.fill(BG_COLOR)
         dialogue_box_rect = pygame.Rect(50, SCREEN_HEIGHT - 250, SCREEN_WIDTH - 100, 200)
         pygame.draw.rect(surface, PANEL_BG_COLOR, dialogue_box_rect, border_radius=10)
         pygame.draw.rect(surface, PANEL_BORDER_COLOR, dialogue_box_rect, 3, border_radius=10)
 
         stage_data = self.game.story_data.get(self.game.current_stage, {})
-        dialogue = stage_data.get("text", [{"speaker": "错误", "line": "未找到剧情文本"}])[self.dialogue_index]
+        dialogue_list = stage_data.get("text", [{"speaker": "错误", "line": "未找到剧情文本"}])
+        
+        safe_index = self.dialogue_index
+        if safe_index >= len(dialogue_list):
+            safe_index = len(dialogue_list) - 1
+        
+        dialogue = dialogue_list[safe_index]
         speaker, full_line = dialogue["speaker"], dialogue["line"]
         
         if speaker != "旁白":

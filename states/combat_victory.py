@@ -1,7 +1,6 @@
 # states/combat_victory.py
 import pygame
 from states.base import BaseState
-from states.loot import LootScreen
 from ui import draw_health_bar, draw_text
 from settings import *
 
@@ -11,6 +10,7 @@ class CombatVictoryScreen(BaseState):
         self.final_enemy = final_enemy
 
     def handle_event(self, event):
+        from states.loot import LootScreen # <-- Import 移至此处
         if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1) or \
            (event.type == pygame.KEYDOWN and event.key in [pygame.K_RETURN, pygame.K_SPACE]):
             self.game.state_stack.pop()

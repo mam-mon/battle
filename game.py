@@ -1,17 +1,17 @@
 # game.py
-
 import pygame
 import pickle
 import os
 import time
 import json
+import sys
 from settings import *
 from ui import init_fonts
 from Character import Character
 import Equips
-import sys
 
 class Game:
+    # ... (__init__ 方法保持不变) ...
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -23,19 +23,18 @@ class Game:
 
         self.player = None
         self.current_stage = "1"
-        self.loaded_dialogue_index = 0 # Used to pass loaded index to StoryScreen
+        self.loaded_dialogue_index = 0
 
-        # Load data
         self.story_data = self._load_json("story.json")
         self.enemy_data = self._load_json("enemies.json")
         self.loot_data = self._load_json("loot_tables.json")
 
+    # ... (run, handle_events, update, draw, _load_json, get_save_filename 方法保持不变) ...
     def run(self):
-        # Import the initial state class here to avoid circular imports
         from states.title import TitleScreen
         self.state_stack.append(TitleScreen(self))
 
-        while self.running and len(self.state_stack) > 0:
+        while self.running and self.state_stack:
             self.handle_events()
             self.update()
             self.draw()
@@ -46,19 +45,16 @@ class Game:
 
     def handle_events(self):
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                self.running = False
-            
-            # Let the current state handle the event
+            if event.type == pygame.QUIT: self.running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: self.running = False
             self.state_stack[-1].handle_event(event)
 
     def update(self):
         self.state_stack[-1].update()
 
     def draw(self):
-        self.state_stack[-1].draw(self.screen)
+        if self.state_stack:
+            self.state_stack[-1].draw(self.screen)
         pygame.display.flip()
 
     def _load_json(self, filename):
@@ -71,12 +67,23 @@ class Game:
     def get_save_filename(self, slot_number):
         return f"save_slot_{slot_number}.dat"
 
+    # --- 新增的方法 ---
+    def peek_save_slot(self, slot_number):
+        """只读取存档信息，不修改游戏状态"""
+        filename = self.get_save_filename(slot_number)
+        if not os.path.exists(filename): return None
+        try:
+            with open(filename, "rb") as f:
+                return pickle.load(f)
+        except Exception:
+            return None
+    # --- 结束新增 ---
+
     def save_to_slot(self, slot_number):
         filename = self.get_save_filename(slot_number)
         try:
             dialogue_index = 0
             from states.story import StoryScreen
-            # Find the story state in the stack to get its progress
             for state in reversed(self.state_stack):
                 if isinstance(state, StoryScreen):
                     dialogue_index = state.dialogue_index
@@ -96,18 +103,14 @@ class Game:
             return "存档失败！"
 
     def load_from_slot(self, slot_number):
-        filename = self.get_save_filename(slot_number)
-        if not os.path.exists(filename): return None
-        try:
-            with open(filename, "rb") as f:
-                data = pickle.load(f)
-                self.player = data["player"]
-                self.current_stage = data["current_stage"]
-                self.loaded_dialogue_index = data.get("dialogue_index", 0)
-                return data
-        except Exception as e:
-            print(f"Load failed: {e}")
-            return None
+        """加载存档并修改游戏状态"""
+        data = self.peek_save_slot(slot_number)
+        if data:
+            self.player = data["player"]
+            self.current_stage = data["current_stage"]
+            self.loaded_dialogue_index = data.get("dialogue_index", 0)
+            return True
+        return False
             
     def start_new_game(self):
         player_eq = [Equips.WoodenSword(), Equips.WoodenArmor()]

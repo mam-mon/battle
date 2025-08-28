@@ -20,10 +20,11 @@ class LootScreen(BaseState):
         self.loot_messages = self._generate_loot(enemy_id)
         
         next_stage = stage_data["next_win"]
-        self.game.save_to_slot(0) # 自动存档
+        self.game.save_to_slot(0)
         self.game.current_stage = next_stage
 
     def _generate_loot(self, enemy_id):
+        # ... (此方法内部不变)
         possible_drops = self.game.loot_data.get(enemy_id, [])
         messages = ["战利品结算："]
         found_loot = False
@@ -44,28 +45,25 @@ class LootScreen(BaseState):
         return messages
 
     def handle_event(self, event):
+        from states.story import StoryScreen # <-- Import 移至此处
+        from states.title import TitleScreen # <-- Import 移至此处
+
         if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1) or \
            (event.type == pygame.KEYDOWN and event.key in [pygame.K_RETURN, pygame.K_SPACE]):
-            from states.story import StoryScreen
             self.game.state_stack.pop()
             if self.game.current_stage != "quit":
                 self.game.state_stack.append(StoryScreen(self.game))
             else:
-                self.game.running = False
+                self.game.state_stack = [TitleScreen(self.game)]
     
-    # In states/loot.py
-
     def draw(self, surface):
         surface.fill(BG_COLOR)
         panel_rect = pygame.Rect(SCREEN_WIDTH * 0.15, SCREEN_HEIGHT * 0.15, SCREEN_WIDTH * 0.7, SCREEN_HEIGHT * 0.7)
         draw_panel(surface, panel_rect, "战斗结算", self.game.fonts['large'])
         
-        # --- 这是核心修改 ---
-        # 如果消息是 None，则视为空列表 []
         exp_msgs = self.exp_messages or []
         loot_msgs = self.loot_messages or []
         all_messages = exp_msgs + ["-"*20] + loot_msgs
-        # --- 修改结束 ---
         
         current_y = panel_rect.top + 120
         for line in all_messages:

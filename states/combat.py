@@ -2,12 +2,9 @@
 import pygame
 import time
 from states.base import BaseState
-from states.combat_victory import CombatVictoryScreen
-from states.title import TitleScreen # 用于战斗失败返回
 from ui import draw_health_bar, draw_text
 from settings import *
 from Character import Character
-import Equips # 确保可以创建装备
 
 class CombatScreen(BaseState):
     def __init__(self, game):
@@ -29,6 +26,9 @@ class CombatScreen(BaseState):
         self.latest_action = "战斗开始！"
 
     def update(self):
+        from states.combat_victory import CombatVictoryScreen # <-- Import 移至此处
+        from states.title import TitleScreen # <-- Import 移至此处
+
         now = time.time()
         dt = now - self.last_update_time
         self.last_update_time = now
@@ -45,10 +45,10 @@ class CombatScreen(BaseState):
         if self.game.player.hp <= 0 or self.enemy.hp <= 0:
             winner = self.game.player if self.game.player.hp > 0 else self.enemy
             
-            self.game.state_stack.pop() # 弹出自己
+            self.game.state_stack.pop()
             if winner is self.game.player:
                 self.game.state_stack.append(CombatVictoryScreen(self.game, self.enemy))
-            else: # 失败则清空栈，回到标题
+            else:
                 self.game.state_stack = [TitleScreen(self.game)]
 
     def draw(self, surface):
@@ -57,6 +57,5 @@ class CombatScreen(BaseState):
         draw_health_bar(surface, player_hp_rect, self.game.player)
         enemy_hp_rect = pygame.Rect(SCREEN_WIDTH - 550, 50, 500, 40)
         draw_health_bar(surface, enemy_hp_rect, self.enemy)
-
         action_log_rect = pygame.Rect(0, SCREEN_HEIGHT - 80, SCREEN_WIDTH, 50)
         draw_text(surface, f"最新行动: {self.latest_action}", self.game.fonts['normal'], TEXT_COLOR, action_log_rect)

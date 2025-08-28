@@ -14,26 +14,30 @@ class LoadScreen(BaseState):
 
     def handle_event(self, event):
         if self.back_button.handle_event(event):
-            self.game.state_stack.pop() # 弹出当前状态，返回上一层
+            self.game.state_stack.pop()
             return
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for i, rect in enumerate(self.slot_rects):
                 if rect.collidepoint(event.pos):
+                    # --- 这是核心修复 ---
+                    # load_from_slot 会更新 self.game 的 player, current_stage 等
                     if self.game.load_from_slot(i):
                         from states.story import StoryScreen
-                        # 加载成功，清空栈并进入新游戏
+                        # 清空整个状态栈，然后压入一个新的、基于已加载数据的 StoryScreen
                         self.game.state_stack = [StoryScreen(self.game)]
                     else:
                         self.load_fail_message = f"槽位 {i} 为空或损坏！"
                     return
+                    # --- 修复结束 ---
 
     def draw(self, surface):
         surface.fill(BG_COLOR)
-        draw_text(surface, "选择要加载的存档", self.game.fonts['large'], TEXT_COLOR, pygame.Rect(0, 50, SCREEN_WIDTH, 100))
+        title_font = self.game.fonts['large']
+        draw_text(surface, "选择要加载的存档", title_font, TEXT_COLOR, pygame.Rect(0, 50, SCREEN_WIDTH, 100))
 
         for i, rect in enumerate(self.slot_rects):
-            slot_data = self.game.load_from_slot(i) # 使用 game 实例的方法
+            slot_data = self.game.peek_save_slot(i)
             is_hovered = rect.collidepoint(pygame.mouse.get_pos())
             if is_hovered:
                 pygame.draw.rect(surface, PANEL_BORDER_COLOR, rect.inflate(10, 10), 2, border_radius=5)
