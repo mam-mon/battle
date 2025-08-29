@@ -84,37 +84,6 @@ def draw_health_bar(surface, rect, char):
     # 边框
     pygame.draw.rect(surface, PANEL_BORDER_COLOR, rect, 2, border_radius=5)
 
-    # 文字 (需要从 settings.py 导入字体)
-    # 确保 ui.py 顶部有 from settings import *
-    fonts = init_fonts() # 获取字体
-    hp_text = f"{char.name} HP: {int(char.hp)}/{int(char.max_hp)} | 盾: {int(char.shield)}"
-    text_surf = fonts['normal'].render(hp_text, True, TEXT_COLOR)
-    text_rect = text_surf.get_rect(center=rect.center)
-    surface.blit(text_surf, text_rect)
-
-    # In ui.py (add this entire function to the end of the file)
-
-def draw_health_bar(surface, rect, char):
-    """在指定矩形内绘制一个角色的血条、护盾和数值"""
-    # 背景
-    pygame.draw.rect(surface, (50, 50, 50), rect, border_radius=5)
-
-    # 血量
-    hp_percent = char.hp / char.max_hp if char.max_hp > 0 else 0
-    hp_width = (rect.width - 4) * hp_percent
-    hp_rect = pygame.Rect(rect.left + 2, rect.top + 2, hp_width, rect.height - 4)
-    pygame.draw.rect(surface, HP_BAR_GREEN, hp_rect, border_radius=5)
-
-    # 护盾 (从右侧覆盖)
-    if char.shield > 0:
-        shield_percent = min(char.shield / char.max_hp, 1.0) if char.max_hp > 0 else 0
-        shield_width = (rect.width - 4) * shield_percent
-        shield_rect = pygame.Rect(rect.right - 2 - shield_width, rect.top + 2, shield_width, rect.height - 4)
-        pygame.draw.rect(surface, SHIELD_BAR_GREY, shield_rect, border_radius=5)
-
-    # 边框
-    pygame.draw.rect(surface, PANEL_BORDER_COLOR, rect, 2, border_radius=5)
-
     # 文字
     fonts = init_fonts() # 获取字体
     hp_text = f"{char.name} HP: {int(char.hp)}/{int(char.max_hp)} | 盾: {int(char.shield)}"
