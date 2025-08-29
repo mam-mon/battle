@@ -121,3 +121,7 @@ def draw_health_bar(surface, rect, char):
     text_surf = fonts['normal'].render(hp_text, True, TEXT_COLOR)
     text_rect = text_surf.get_rect(center=rect.center)
     surface.blit(text_surf, text_rect)
+
+def get_display_name(obj):
+    """获取一个对象的显示名称，如果不存在则返回其类名"""
+    return getattr(obj, 'display_name', obj.__class__.__name__)

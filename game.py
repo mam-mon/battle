@@ -45,10 +45,11 @@ class Game:
 
     def handle_events(self):
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: self.running = False
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: self.running = False
-            self.state_stack[-1].handle_event(event)
+            if event.type == pygame.QUIT:
+                self.running = False
 
+            if self.state_stack:
+                self.state_stack[-1].handle_event(event)
     def update(self):
         self.state_stack[-1].update()
 
@@ -67,7 +68,6 @@ class Game:
     def get_save_filename(self, slot_number):
         return f"save_slot_{slot_number}.dat"
 
-    # --- 新增的方法 ---
     def peek_save_slot(self, slot_number):
         """只读取存档信息，不修改游戏状态"""
         filename = self.get_save_filename(slot_number)
@@ -77,7 +77,6 @@ class Game:
                 return pickle.load(f)
         except Exception:
             return None
-    # --- 结束新增 ---
 
     def save_to_slot(self, slot_number):
         filename = self.get_save_filename(slot_number)

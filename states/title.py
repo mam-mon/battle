@@ -1,7 +1,7 @@
 # states/title.py
 import pygame
-from states.base import BaseState
-from states.loading import LoadScreen
+from .base import BaseState
+from .loading import LoadScreen
 from ui import Button
 from settings import *
 
@@ -29,6 +29,9 @@ class TitleScreen(BaseState):
 
         elif self.buttons['load_game'].handle_event(event):
             self.game.state_stack.append(LoadScreen(self.game))
+
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.game.running = False # 在主菜单按ESC则退出
 
     def draw(self, surface):
         surface.fill(BG_COLOR)

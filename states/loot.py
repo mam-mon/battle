@@ -1,6 +1,6 @@
 # states/loot.py
 import pygame
-from states.base import BaseState
+from .base import BaseState
 from ui import draw_panel, draw_text
 from settings import *
 import random

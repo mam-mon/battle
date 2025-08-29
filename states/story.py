@@ -1,8 +1,8 @@
 # states/story.py
 import pygame
-from states.base import BaseState
-from states.saving import SaveScreen
-from states.loading import LoadScreen
+from .base import BaseState
+from .saving import SaveScreen
+from .loading import LoadScreen
 from ui import draw_text
 from settings import *
 

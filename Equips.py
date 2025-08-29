@@ -42,6 +42,7 @@ class Equipment:
 class WoodenShield(Equipment):
     """木盾：副手插槽；+2 防御；战斗开始时获得 10 护盾"""
     slot = "offhand"
+    display_name    = "木盾"
 
     def __init__(self):
         self.def_bonus    = 2
@@ -55,6 +56,7 @@ class WoodenShield(Equipment):
 class WoodenSword(Equipment):
     """木剑：武器插槽；+3 攻击；每普攻 3 次，第 4 次普攻造成双倍伤害"""
     slot = "weapon"
+    display_name    = "木剑"
 
     def __init__(self):
         self.atk_bonus = 3
@@ -79,6 +81,7 @@ class WoodenSword(Equipment):
 class WoodenArmor(Equipment):
     """木铠甲：护甲插槽；+2 防御；50% 概率额外减免 2 点伤害"""
     slot = "armor"
+    display_name    = "木铠甲"
 
     def __init__(self):
         self.def_bonus = 2
@@ -96,6 +99,7 @@ class IronSword(Equipment):
     """铁剑：武器插槽；+5 攻击；基础 +5% 暴击率；  
        未暴击时，下一次普攻暴击率 +5%，最多 8 层；暴击后清除自身叠加"""
     slot = "weapon"
+    display_name    = "铁剑"
 
     def __init__(self):
         self.atk_bonus        = 5
@@ -127,6 +131,7 @@ class IronSword(Equipment):
 class IronRing(Equipment):
     """铁戒指：饰品槽；+5% 暴击；+10% 爆伤；赠送两层“刚毅”Buff"""
     slot = "accessory"
+    display_name    = "贴戒指"
 
     def __init__(self):
         self.crit_bonus     = 0.05
@@ -143,6 +148,7 @@ class IronRing(Equipment):
 class IronHammer(Equipment):
     """铁锤：武器槽；+8 攻击；+5% 暴击；20% 概率眩晕敌人 2 秒"""
     slot = "weapon"
+    display_name    = "铁锤"
 
     def __init__(self):
         self.atk_bonus          = 8
@@ -165,6 +171,7 @@ class IronHammer(Equipment):
 class NaturalNecklace(Equipment):
     """自然项链：饰品槽；最大 HP +20；提供 2 层“再生”Buff"""
     slot = "accessory"
+    display_name    = "自然项链"
 
     def __init__(self):
         self.hp_bonus = 20
@@ -179,6 +186,7 @@ class NaturalNecklace(Equipment):
 class ThornsRing(Equipment):
     """荆棘环：饰品槽；+0.2 攻速；+10% 爆伤；战斗开始时提供 3 层 荆棘"""
     slot = "accessory"
+    display_name    = "荆棘环"
 
     def __init__(self):
         self.atk_speed_bonus   = 0.2   # +0.2 次/s
@@ -195,8 +203,9 @@ class ThornsRing(Equipment):
         wearer.add_status(Buffs.ThornsBuff(stacks=self.thorns_stacks))
 
 class PhoenixCrown(Equipment):
-    """凤翅紫金冠：头盔槽；无基础属性；附加“不灭”效果"""
+    """紫金冠：头盔槽；无基础属性；附加“不灭”效果"""
     slot = "helmet"
+    display_name    = "紫金冠"
 
     def on_battle_start(self, wearer):
         # 战斗开始时给自己挂“不灭” Buff

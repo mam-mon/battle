@@ -1,7 +1,7 @@
 # states/loading.py
 import pygame
 import time
-from states.base import BaseState
+from .base import BaseState
 from ui import draw_text, Button
 from settings import *
 
@@ -13,7 +13,7 @@ class LoadScreen(BaseState):
         self.load_fail_message = None
 
     def handle_event(self, event):
-        if self.back_button.handle_event(event):
+        if self.back_button.handle_event(event) or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
             self.game.state_stack.pop()
             return
 

@@ -1,6 +1,6 @@
 # states/combat_victory.py
 import pygame
-from states.base import BaseState
+from .base import BaseState
 from ui import draw_health_bar, draw_text
 from settings import *
 
