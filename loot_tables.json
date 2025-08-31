@@ -1,0 +1,18 @@
+{
+    "slime": [
+        {
+            "item_class_name": "SlimeSword",
+            "chance": 0.99
+        },
+        {
+            "item_class_name": "WoodenShield",
+            "chance": 0.10
+        }
+    ],
+    "goblin": [
+        {
+            "item_class_name": "IronSword",
+            "chance": 0.15
+        }
+    ]
+}
