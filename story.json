@@ -27,6 +27,25 @@
     "4": {
         "type": "story",
         "text": [
+            { "speaker": "猎人", "line": "你的第一个任务，就是独自进入那座『日之石遗迹』..." },
+            { "speaker": "猎人", "line": "抵达最深处的圣堂，并带回试炼完成的证明。准备好了吗？" },
+            { 
+                "speaker": "玩家", 
+                "line": "我准备好了。",
+                "action": "start_trial"
+            }
+        ],
+        "next": "4" 
+    },
+    "trial_combat": {
+        "type": "combat",
+        "enemy_id": "slime", 
+        "next_win": "map_return", 
+        "next_lose": "title"
+    },
+    "5": {
+        "type": "story",
+        "text": [
             { "speaker": "旁白", "line": "……" },
             { "speaker": "旁白", "line": "………………" },
             { "speaker": "你", "line": "……唔……好困…………" },

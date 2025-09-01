@@ -7,6 +7,7 @@ from settings import *
 class ConfirmDialog(BaseState):
     def __init__(self, game, text, on_confirm):
         super().__init__(game)
+        self.is_overlay = True
         self.text = text
         self.on_confirm = on_confirm # 接受一个“确认”后要执行的函数
 
@@ -29,9 +30,7 @@ class ConfirmDialog(BaseState):
             self.game.state_stack.pop() # 按ESC也视为取消
 
     def draw(self, surface):
-        # 1. 先绘制底层界面（使其变暗）
-        if len(self.game.state_stack) > 1:
-            self.game.state_stack[-2].draw(surface)
+        
         
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 180))

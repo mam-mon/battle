@@ -1,0 +1,39 @@
+{
+    "fountain_of_power": {
+        "title": "力量源泉",
+        "description": "你发现一个散发着微光的源泉。泉水似乎蕴含着奇特的力量，你可以从中感受到生命与毁灭的气息。",
+        "choices": [
+            {
+                "text": "喝一口 (恢复全部生命)",
+                "outcomes": [
+                    { "type": "HEAL", "amount": "full", "result_text": "泉水让你精神焕发，所有伤痛都消失了！" }
+                ]
+            },
+            {
+                "text": "将武器浸入 (风险与机遇)",
+                "outcomes": [
+                    { "type": "WEAPON_UPGRADE", "chance": 0.6, "result_text": "你的武器吸收了源泉的力量，变得更加锋利了！(攻击力+5)" },
+                    { "type": "WEAPON_CURSE", "chance": 0.4, "result_text": "武器无法承受这股力量，反而变得迟钝了...(攻击力-3)" }
+                ]
+            }
+        ]
+    },
+    "wandering_spirit": {
+        "title": "迷途的古代灵魂",
+        "description": "一个半透明的灵魂在你面前徘徊，它似乎在寻求帮助，又像是在守护着什么。",
+        "choices": [
+            {
+                "text": "帮助它安息 (获得天赋)",
+                "outcomes": [
+                    { "type": "GAIN_TALENT", "talent_class_name": "HeartOfHealingTalent", "result_text": "灵魂感激地消散了，你从中领悟了「治愈之心」！" }
+                ]
+            },
+            {
+                "text": "攻击它 (触发战斗)",
+                "outcomes": [
+                    { "type": "TRIGGER_COMBAT", "enemy_id": "goblin_captain", "result_text": "灵魂发出了尖啸，化作一个强大的敌人向你袭来！" }
+                ]
+            }
+        ]
+    }
+}

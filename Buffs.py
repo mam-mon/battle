@@ -1,3 +1,4 @@
+from damage import DamagePacket, DamageType
 from abc import ABC
 import collections
 from collections import defaultdict
@@ -106,7 +107,7 @@ class RegenerationBuff(Buff):
 
 class PoisonDebuff(Buff):
     """
-    毒：每层每秒对角色造成 1 点伤害；优先消耗护盾
+    毒：每层每秒对角色造成 1 点毒系伤害；优先消耗护盾
     """
     display_name = "毒"
     dispellable  = True
@@ -115,16 +116,21 @@ class PoisonDebuff(Buff):
 
     def __init__(self, stacks: int = 1):
         super().__init__(stacks=stacks)
-        self._timer = 0.0  # 修改：使用 _timer 替代 _accum
+        self._timer = 0.0
 
     def on_tick(self, wearer, dt):
-        self._timer += dt  # 累加每帧的时间
-
-        # 当计时器超过或等于1秒时，执行伤害
+        self._timer += dt
         while self._timer >= 1.0:
-            dmg = self.stacks  # 每秒伤害量 = 层数
-            wearer.take_damage(dmg)
-            self._timer -= 1.0  # 计时器减去1秒
+            dmg = self.stacks
+            # <-- 核心修改：创建并发送一个伤害信息包 -->
+            packet = DamagePacket(
+                amount=dmg, 
+                damage_type=DamageType.POISON, # 类型是毒
+                is_dot=True,                   # 标记为持续伤害
+                is_sourceless=True             # 标记为无来源伤害
+            )
+            wearer.take_damage(packet)
+            self._timer -= 1.0
         return None
 
 
@@ -176,20 +182,24 @@ class StunDebuff(Buff):
         return None
 
 
+# 替换 Buffs.py 中的 ThornsBuff 类
 class ThornsBuff(Buff):
-    """荆棘：被攻击时反弹当前层数的伤害给攻击者"""
+    """荆棘：被攻击时反弹当前层数的真实伤害给攻击者"""
     display_name  = "荆棘"
     dispellable   = True
     is_debuff     = False
-    max_stacks   = 99      # <<< 允许最多 99 层
-
-    def __init__(self, stacks: int = 1):
-        super().__init__(stacks=stacks)
+    max_stacks    = 99
 
     def on_attacked(self, wearer, attacker, dmg):
         if attacker is not None and self.stacks > 0 and attacker.hp > 0:
-            attacker.take_damage(self.stacks, attacker=wearer)  # 可选：传 wearer 作为反击者
-
+            # 创建一个真实伤害、无来源的伤害包进行反伤
+            thorns_packet = DamagePacket(
+                amount=self.stacks,
+                damage_type=DamageType.TRUE,
+                source=wearer,
+                is_sourceless=True
+            )
+            attacker.take_damage(thorns_packet)
 
 class PhoenixCrownStage1Buff(Buff):
     """不灭·觉醒（Stage1）：防御→攻击+攻速"""
@@ -279,3 +289,68 @@ class PhoenixCrownStage2Buff(Buff):
             return text
 
         return None
+    
+class StormDebuff(Buff):
+    """
+    风暴印记 (可驱散)
+    当携带者受到下一次任意来源的伤害时，
+    此印记会引爆，造成额外伤害，然后消失。
+    """
+    display_name = "风暴"
+    dispellable  = True
+    is_debuff    = True
+
+    def before_take_damage(self, wearer, packet: DamagePacket): # <-- 接收 packet
+        print("[风暴引爆!] 造成额外伤害")
+        # 直接在传入的伤害包上增加伤害
+        packet.amount += 50
+        # 移除自己
+        wearer.remove_buff(self)
+
+
+class BleedDebuff(Buff):
+    """
+    流血 (可叠加, 可驱散)
+    每层每秒对目标造成 1 点真实伤害（无视防御）。
+    """
+    display_name = "流血"
+    dispellable  = True
+    is_debuff    = True
+    max_stacks   = 99
+
+    def __init__(self, stacks: int = 1, duration: float = 5.0):
+        super().__init__(stacks=stacks, duration_override=duration)
+        self._timer = 0.0
+
+    def on_tick(self, wearer, dt):
+        self._timer += dt
+        if self._timer >= 1.0:
+            dmg = self.stacks
+            # <-- 核心修改：创建并发送一个伤害信息包 -->
+            packet = DamagePacket(
+                amount=dmg,
+                damage_type=DamageType.TRUE, # 类型是真实伤害
+                is_dot=True,
+                is_sourceless=True
+            )
+            wearer.take_damage(packet)
+            self._timer -= 1.0
+        
+        self.remaining -= dt
+        if self.remaining <= 0:
+            wearer.remove_buff(self)
+        return None
+
+class BlockBuff(Buff):
+    """格挡：每层可以完全抵挡一次任意来源的伤害。"""
+    display_name = "格挡"
+    max_stacks   = 99
+
+    def before_take_damage(self, wearer, packet: DamagePacket): # <-- 参数改为 packet
+        if self.stacks > 0 and packet.amount > 0:
+            print(f"[格挡] 效果触发！抵挡了 {int(packet.amount)} 点伤害。")
+            self.stacks -= 1
+            if self.stacks <= 0:
+                wearer.remove_buff(self)
+            
+            packet.amount = 0 # 将伤害包的数值清零

@@ -8,17 +8,58 @@
             "attack": 5,
             "attack_speed": 1.0
         },
-        "exp_reward": 50
+        "exp_reward": 5
     },
     "goblin": {
         "name": "哥布林",
         "stats": {
-            "hp": 80,
+            "hp": 40,
             "defense": 4,
             "magic_resist": 2,
             "attack": 8,
             "attack_speed": 1.2
         },
-        "exp_reward": 80
+        "exp_reward": 8
+    
+    },
+    "goblin_captain": {
+        "name": "哥布林队长",
+        "stats": {
+            "hp": 80,
+            "defense": 4,
+            "magic_resist": 2,
+            "attack": 10,
+            "attack_speed": 1.5
+        },
+        "exp_reward": 15
+    
+    },
+    "ruin_golem": {
+        "name": "遗迹魔像",
+        "stats": {
+            "hp": 100,
+            "defense": 10,
+            "magic_resist": 2,
+            "attack": 20,
+            "attack_speed": 0.7
+        },
+        "exp_reward": 50
+    
+    },
+    "poisonDragon": {
+        "name": "毒龙",
+        "stats": {
+            "hp": 800,
+            "defense": 14,
+            "magic_resist": 2,
+            "attack": 8,
+            "attack_speed": 1.2
+        },
+        "talents": [
+            "PoisonousTalent",
+            "BambooLeafTalent"
+        ],
+        "exp_reward": 800
+    
     }
 }
