@@ -32,8 +32,14 @@ class Game:
         self.story_data = self._load_json("story.json")
         self.enemy_data = self._load_json("enemies.json")
         self.loot_data = self._load_json("loot_tables.json")
-        self.map_data = self._load_json("map_data.json")
         self.event_data = self._load_json("events.json")
+
+        self.dungeon_data = {}
+        dungeon_folder = 'dungeons'
+        for filename in os.listdir(dungeon_folder):
+            if filename.endswith('.json'):
+                dungeon_id = filename.split('.')[0]
+                self.dungeon_data[dungeon_id] = self._load_json(os.path.join(dungeon_folder, filename))
 
     def run(self):
         from states.title import TitleScreen
@@ -132,17 +138,13 @@ class Game:
         player_talents = [
             Talents.HeartOfHealingTalent(), # 治愈之心
             Talents.DualWieldTalent(),       # 二刀流
-            Talents.ThousandWorldTalent(),
-            Talents.TripleWieldTalent(),
-            Talents.BambooLeafTalent()
-
         ]
         self.player = Character(
             "玩家", 
             hp=300, 
             defense=5, 
             magic_resist=3, 
-            attack=10, 
+            attack=20, 
             attack_speed=1.2, 
             equipment=player_eq,
             talents=player_talents  # <-- 将天赋列表传给角色

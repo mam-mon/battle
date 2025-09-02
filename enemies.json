@@ -8,7 +8,8 @@
             "attack": 5,
             "attack_speed": 1.0
         },
-        "exp_reward": 5
+        "exp_reward": 5,
+        "possible_talents": [{"talent_class_name": "PoisonousTalent", "chance": 0.5}]
     },
     "goblin": {
         "name": "哥布林",
@@ -19,32 +20,81 @@
             "attack": 8,
             "attack_speed": 1.2
         },
-        "exp_reward": 8
-    
+        "exp_reward": 8,
+        "possible_talents": [{"talent_class_name": "DualWieldTalent", "chance": 0.5}]
+        
+    },
+    "goblin_archer": {
+        "name": "哥布林弓箭手", "exp_reward": 30,
+        "stats": {"hp": 60, "defense": 2, "magic_resist": 1, "attack": 10, "attack_speed": 1.8},
+        "possible_talents": [{"talent_class_name": "FirstStrike", "chance": 0.15}]
     },
     "goblin_captain": {
-        "name": "哥布林队长",
-        "stats": {
-            "hp": 80,
-            "defense": 4,
-            "magic_resist": 2,
-            "attack": 10,
-            "attack_speed": 1.5
-        },
-        "exp_reward": 15
-    
+        "name": "哥布林队长", "exp_reward": 80,
+        "stats": {"hp": 150, "defense": 8, "magic_resist": 5, "attack": 18, "attack_speed": 1.2},
+        "possible_talents": [{"talent_class_name": "Brawler", "chance": 0.5}]
+    },
+    "armored_skeleton": {
+        "name": "重甲骷髅", "exp_reward": 40,
+        "stats": {"hp": 100, "defense": 20, "magic_resist": 5, "attack": 15, "attack_speed": 0.8}
+    },
+    "giant_bat": {
+        "name": "巨型蝙蝠", "exp_reward": 35,
+        "stats": {"hp": 70, "defense": 3, "magic_resist": 3, "attack": 10, "attack_speed": 2.5}
+    },
+    "wild_boar": {
+        "name": "狂野野猪", "exp_reward": 50,
+        "stats": {"hp": 200, "defense": 5, "magic_resist": 2, "attack": 20, "attack_speed": 1.0}
+    },
+    "forest_spirit": {
+        "name": "森林之灵", "exp_reward": 60,
+        "stats": {"hp": 120, "defense": 5, "magic_resist": 15, "attack": 15, "attack_speed": 1.1},
+        "possible_talents": [{"talent_class_name": "MagicShield", "chance": 1.0}]
+    },
+    "rock_golem": {
+        "name": "岩石傀儡", "exp_reward": 70,
+        "stats": {"hp": 300, "defense": 15, "magic_resist": 10, "attack": 22, "attack_speed": 0.7},
+        "possible_talents": [{"talent_class_name": "Giant", "chance": 1.0}]
     },
     "ruin_golem": {
-        "name": "遗迹魔像",
-        "stats": {
-            "hp": 100,
-            "defense": 10,
-            "magic_resist": 2,
-            "attack": 20,
-            "attack_speed": 0.7
-        },
-        "exp_reward": 50
-    
+        "name": "遗迹守护者", "exp_reward": 200,
+        "stats": {"hp": 500, "defense": 25, "magic_resist": 15, "attack": 30, "attack_speed": 0.9},
+        "possible_talents": [{"talent_class_name": "LastStand", "chance": 1.0}]
+    },
+    "mimic": {
+        "name": "宝箱怪", "exp_reward": 100,
+        "stats": {"hp": 150, "defense": 10, "magic_resist": 10, "attack": 25, "attack_speed": 1.5}
+
+    },
+    "fire_elemental": {
+        "name": "火焰元素", "exp_reward": 120,
+        "stats": {"hp": 180, "defense": 8, "magic_resist": 20, "attack": 28, "attack_speed": 1.3},
+        "possible_talents": [{"talent_class_name": "FlameAura", "chance": 1.0}]
+    },
+    "ice_elemental": {
+        "name": "冰霜元素", "exp_reward": 120,
+        "stats": {"hp": 180, "defense": 8, "magic_resist": 20, "attack": 28, "attack_speed": 1.3},
+        "possible_talents": [{"talent_class_name": "FrostAura", "chance": 1.0}]
+    },
+    "orc_warrior": {
+        "name": "兽人战士", "exp_reward": 150,
+        "stats": {"hp": 250, "defense": 12, "magic_resist": 5, "attack": 35, "attack_speed": 1.0},
+        "possible_talents": [{"talent_class_name": "Berserker", "chance": 0.5}]
+    },
+    "orc_shaman": {
+        "name": "兽人萨满", "exp_reward": 150,
+        "stats": {"hp": 200, "defense": 8, "magic_resist": 15, "attack": 30, "attack_speed": 1.2},
+        "possible_talents": [{"talent_class_name": "HealingWave", "chance": 0.5}]
+    },
+    "dark_knight": {
+        "name": "黑暗骑士", "exp_reward": 300,
+        "stats": {"hp": 400, "defense": 20, "magic_resist": 10, "attack": 50, "attack_speed": 1.0},
+        "possible_talents": [{"talent_class_name": "Executioner", "chance": 1.0}]
+    },
+    "necromancer": {
+        "name": "死灵法师", "exp_reward": 250,
+        "stats": {"hp": 300, "defense": 10, "magic_resist": 25, "attack": 40, "attack_speed": 1.1},
+        "possible_talents": [{"talent_class_name": "SummonSkeletons", "chance": 1.0}]
     },
     "poisonDragon": {
         "name": "毒龙",
@@ -60,6 +110,5 @@
             "BambooLeafTalent"
         ],
         "exp_reward": 800
-    
     }
 }

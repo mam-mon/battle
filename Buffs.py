@@ -354,3 +354,16 @@ class BlockBuff(Buff):
                 wearer.remove_buff(self)
             
             packet.amount = 0 # 将伤害包的数值清零
+
+
+class DragonSoulBuff(Buff):
+    """【龙魂】：一种特殊的能量资源，可被消耗。"""
+    display_name = "龙魂"
+    max_stacks   = 10 # 龙魂上限为10层
+    is_debuff    = False
+
+class SunstoneBrandDebuff(Buff):
+    """【日之烙印】：一种可被引爆的印记。"""
+    display_name = "日之烙印"
+    is_debuff    = True
+    max_stacks   = 99

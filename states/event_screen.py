@@ -47,12 +47,13 @@ class EventScreen(BaseState):
             if self.continue_button.handle_event(event):
                 self._leave_event()
 
+    # 在 states/event_screen.py 文件中，找到并替换这个函数
+
     def _process_choice(self, choice_index):
         """处理玩家的选择并计算结果"""
         choice_data = self.event_data["choices"][choice_index]
         outcomes = choice_data["outcomes"]
         
-        # 处理带概率的结果
         rand_val = random.random()
         cumulative_chance = 0.0
         selected_outcome = None
@@ -64,7 +65,6 @@ class EventScreen(BaseState):
         
         if not selected_outcome: return
 
-        # --- 根据结果类型，执行相应的游戏逻辑 ---
         outcome_type = selected_outcome["type"]
         self.result_text = selected_outcome["result_text"]
         
@@ -74,7 +74,6 @@ class EventScreen(BaseState):
                 player.hp = player.max_hp
         
         elif outcome_type == "WEAPON_UPGRADE":
-            # 简单地给玩家基础攻击力加成
             player.base_attack += 5
             player.attack += 5
         
@@ -82,24 +81,31 @@ class EventScreen(BaseState):
             player.base_attack = max(1, player.base_attack - 3)
             player.attack = max(1, player.attack - 3)
             
+        # --- 核心修复：使用新的天赋学习和装备逻辑 ---
         elif outcome_type == "GAIN_TALENT":
             talent_class_name = selected_outcome["talent_class_name"]
             if hasattr(Talents, talent_class_name):
-                # 检查是否已有同名天赋
-                if not any(isinstance(t, getattr(Talents, talent_class_name)) for t in player.talents):
-                    player.talents.append(getattr(Talents, talent_class_name)())
+                talent_instance = getattr(Talents, talent_class_name)()
+                
+                # 1. 尝试学习新天赋
+                was_new = player.learn_talent(talent_instance)
+                
+                if was_new:
+                    # 2. 如果是新学会的，尝试自动装备它
+                    was_equipped = player.equip_talent(talent_instance)
+                    if not was_equipped:
+                        self.result_text += " (天赋槽已满，请在天赋界面(T)手动装备)"
                 else:
                     self.result_text = "你似乎已经领悟过类似的能力了..."
 
         elif outcome_type == "TRIGGER_COMBAT":
             from .combat import CombatScreen
-            # 触发战斗后，需要先关闭事件界面，再进入战斗
             enemy_id = selected_outcome["enemy_id"]
-            self._leave_event() # 先离开
-            self.game.state_stack.append(CombatScreen(self.game, enemy_id)) # 再进入战斗
+            self._leave_event()
+            # 剧情战斗不需要 origin_id
+            self.game.state_stack.append(CombatScreen(self.game, enemy_id)) 
             return
             
-        # 切换到结果显示模式
         self.view_mode = 'showing_result'
 
     def _leave_event(self):

@@ -1,6 +1,7 @@
 # states/combat.py (已更新)
 import pygame
 import time
+import random # 导入 random
 from .base import BaseState
 from ui import draw_character_panel, BattleLog, TooltipManager, Button, draw_panel
 from settings import *
@@ -8,12 +9,10 @@ from Character import Character
 import Talents
 
 class CombatScreen(BaseState):
-    # __init__ 现在接收 enemy_id 和一个可选的 identifier (可以是node_id或monster_uid)
     def __init__(self, game, enemy_id, origin_identifier=None):
         super().__init__(game)
         self.enemy_id = enemy_id
-        self.origin_id = origin_identifier # 记录来源ID
-        
+        self.origin_id = origin_identifier
         
         self._initialize_combat()
         self.tooltip_manager = TooltipManager(self.game.fonts['small'])
@@ -23,12 +22,28 @@ class CombatScreen(BaseState):
         self.pause_button = Button(pause_button_rect, "||", self.game.fonts['normal'])
 
     def _initialize_combat(self):
-        # ... (此方法保持不变) ...
-        enemy_preset = self.game.enemy_data[self.enemy_id]; enemy_talents = []
-        talent_names = enemy_preset.get("talents", []);
-        for name in talent_names:
-            if hasattr(Talents, name): enemy_talents.append(getattr(Talents, name)())
-        self.enemy = Character(name=enemy_preset["name"], talents=enemy_talents, **enemy_preset["stats"])
+        enemy_preset = self.game.enemy_data[self.enemy_id]
+        
+        # --- 核心改动：敌人的随机天赋生成逻辑 ---
+        rolled_talents = []
+        possible_talents = enemy_preset.get("possible_talents", [])
+        for talent_info in possible_talents:
+            if random.random() < talent_info["chance"]:
+                talent_class_name = talent_info["talent_class_name"]
+                if hasattr(Talents, talent_class_name):
+                    print(f"敌人 {enemy_preset['name']} 获得了天赋: {talent_class_name}")
+                    talent_class = getattr(Talents, talent_class_name)
+                    rolled_talents.append(talent_class())
+        
+        # 使用随机生成的天赋来创建敌人实例
+        self.enemy = Character(
+            id=self.enemy_id, # <-- 增加这一行，把从json读到的id传给Character
+            name=enemy_preset["name"], 
+            talents=rolled_talents, 
+            **enemy_preset["stats"]
+        )
+        
+        # --- 后续逻辑不变 ---
         self.game.player.on_enter_combat(); self.enemy.on_enter_combat()
         for eq in self.game.player.all_equipment: eq.on_battle_start(self.game.player)
         for eq in self.enemy.all_equipment: eq.on_battle_start(self.enemy)
@@ -36,13 +51,13 @@ class CombatScreen(BaseState):
         self.battle_log = BattleLog(BATTLE_LOG_RECT, self.game.fonts['small'])
         self.battle_log.add_message(f"战斗开始！遭遇了 {self.enemy.name}！")
 
+    # 在 states/combat.py 文件中，找到并替换这个函数
+
     def _on_victory(self):
         """战斗胜利后的处理逻辑"""
         from .dungeon_screen import DungeonScreen
         from .loot import LootScreen
         from .title import TitleScreen
-
-        # --- 核心修复：统一所有战斗胜利后的出口都是 LootScreen ---
 
         next_story_stage_id = None
         # 判断战斗来源
@@ -55,14 +70,16 @@ class CombatScreen(BaseState):
             # --- 剧情战斗 ---
             print("主线剧情战斗胜利！")
             current_stage_data = self.game.story_data.get(self.game.current_stage, {})
-            next_story_stage_id = current_stage_data.get("next_win") # 获取下一个剧情ID
+            next_story_stage_id = current_stage_data.get("next_win")
 
         # 弹出自己 (CombatScreen)
         self.game.state_stack.pop()
-        # 统一进入 LootScreen, 并把下一个剧情ID作为“任务”传给它
-        self.game.state_stack.append(LootScreen(self.game, self.enemy_id, next_story_stage=next_story_stage_id))
 
-    # ... (update, draw, handle_event, _update_hovers 保持不变) ...
+        # --- 核心修改在这里 ---
+        # 之前我们传递的是 self.enemy_id (一个字符串)
+        # 现在我们传递整个 self.enemy 对象，它包含了敌人的所有实时信息！
+        self.game.state_stack.append(LootScreen(self.game, self.enemy, next_story_stage=next_story_stage_id))
+        
     def update(self):
         if self.is_paused: return
         from .title import TitleScreen

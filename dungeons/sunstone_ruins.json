@@ -1,0 +1,40 @@
+
+{
+    "id": "sunstone_ruins",
+    "name": "日之石遗迹",
+    "description": "一座被阳光遗忘的古老遗迹，充满了基础的元素生物和哥布林。",
+
+    
+    "floor_pools": [
+        {
+            "floors": [1, 2, 3],
+            "monster_pool": ["slime", "goblin", "giant_bat"], 
+            "elite_pool": ["goblin_captain", "armored_skeleton"], 
+            "boss_id": "ruin_golem",
+            "event_pool": ["fountain_of_power", "wandering_spirit"],
+            "shop_items": {
+                "item_count": 3,
+                "rarity_weights": { "common": 70, "uncommon": 30, "rare": 5 }
+            },
+            "treasure_loot": {
+                "item_count": 2,
+                "rarity_weights": { "common": 60, "uncommon": 35, "rare": 10, "epic": 1 }
+            }
+        },
+        {
+            "floors": [4, 5],
+            "monster_pool": ["wild_boar", "forest_spirit", "rock_golem"],
+            "elite_pool": ["fire_elemental", "ice_elemental"],
+            "boss_id": "dark_knight",
+            "event_pool": ["wandering_spirit"],
+            "shop_items": {
+                "item_count": 4,
+                "rarity_weights": { "common": 20, "uncommon": 50, "rare": 25, "epic": 5 }
+            },
+            "treasure_loot": {
+                "item_count": 2,
+                "rarity_weights": { "common": 10, "uncommon": 40, "rare": 40, "epic": 10 }
+            }
+        }
+    ]
+}

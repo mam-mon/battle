@@ -148,6 +148,10 @@ def draw_buff_icons(surface, char, x, y):
     return drawn_elements
 
 
+# 在 ui.py 文件中，找到并替换这个函数
+
+# 在 ui.py 文件中，找到并替换这个函数
+
 def draw_character_panel(surface, char, rect, fonts):
     """绘制一个完整的角色信息面板, 并返回可交互UI元素的位置和对象"""
     ui_elements = {'talents': [], 'buffs': []}
@@ -160,8 +164,8 @@ def draw_character_panel(surface, char, rect, fonts):
     surface.blit(name_surf, (rect.left + 20, rect.top + 15))
     surface.blit(level_surf, (rect.left + name_surf.get_width() + 30, rect.top + 28))
 
+    # ... (血条、经验条、数值的绘制逻辑保持不变) ...
     hp_bar_rect = pygame.Rect(rect.left + 20, rect.top + 80, rect.width - 40, 30)
-    # ... (血条绘制逻辑保持不变) ...
     hp_percent = char.hp / char.max_hp if char.max_hp > 0 else 0
     hp_width = (hp_bar_rect.width - 4) * hp_percent
     pygame.draw.rect(surface, (50,50,50), hp_bar_rect, border_radius=5)
@@ -174,72 +178,57 @@ def draw_character_panel(surface, char, rect, fonts):
     hp_text = f"{int(char.hp)}/{int(char.max_hp)}" + (f" (+{int(char.shield)})" if char.shield > 0 else "")
     hp_text_surf = fonts['small'].render(hp_text, True, TEXT_COLOR)
     surface.blit(hp_text_surf, hp_text_surf.get_rect(center=hp_bar_rect.center))
-    
     if hasattr(char, 'exp'):
-        # ... (经验条绘制逻辑保持不变) ...
         exp_bar_rect = pygame.Rect(rect.left + 20, rect.top + 120, rect.width - 40, 10)
         pygame.draw.rect(surface, (50,50,50), exp_bar_rect, border_radius=3)
         exp_percent = char.exp / char.exp_to_next_level if char.exp_to_next_level > 0 else 0
         exp_width = exp_bar_rect.width * exp_percent
         pygame.draw.rect(surface, XP_BAR_COLOR, (exp_bar_rect.left, exp_bar_rect.top, exp_width, exp_bar_rect.height), border_radius=3)
-
     stats_text = f"攻击: {int(char.attack)} | 防御: {int(char.defense)} | 攻速: {char.attack_speed:.2f}"
     stats_surf = fonts['small'].render(stats_text, True, TEXT_COLOR)
     surface.blit(stats_surf, (rect.left + 20, rect.top + 140))
 
-    # --- 绘制天赋列表 (逻辑不变) ---
+    # --- 核心修复：使用 char.equipped_talents 来获取天赋 ---
     current_x = rect.left + 20
-    if char.talents:
+    if char.equipped_talents: # <-- 修改点 1
         talent_label_surf = fonts['small'].render("天赋: ", True, (255, 215, 0))
         surface.blit(talent_label_surf, (current_x, rect.top + 170))
         current_x += talent_label_surf.get_width()
 
-        for i, talent in enumerate(char.talents):
+        for i, talent in enumerate(char.equipped_talents): # <-- 修改点 2
             if not talent.display_name: continue
             name_surf = fonts['small'].render(talent.display_name, True, (255, 215, 0))
             name_rect = name_surf.get_rect(left=current_x, top=rect.top + 170)
             surface.blit(name_surf, name_rect)
             ui_elements['talents'].append((name_rect, talent))
             current_x += name_rect.width
-            if i < len(char.talents) - 1:
+            if i < len(char.equipped_talents) - 1: # <-- 修改点 3
                 separator_surf = fonts['small'].render(" | ", True, (255, 215, 0))
                 surface.blit(separator_surf, (current_x, rect.top + 170))
                 current_x += separator_surf.get_width()
 
-    # <-- 核心改动：用新的文本绘制逻辑替换掉 draw_buff_icons -->
+    # --- Buff 绘制逻辑保持不变 ---
     current_x = rect.left + 20
     if char.buffs:
+        # ... (这部分代码无需修改) ...
         status_label_surf = fonts['small'].render("状态: ", True, TEXT_COLOR)
         surface.blit(status_label_surf, (current_x, rect.top + 200))
         current_x += status_label_surf.get_width()
-        
         visible_buffs = [b for b in char.buffs if not b.hidden]
         for i, buff in enumerate(visible_buffs):
-            # 格式化文本，加入层数
             buff_text = buff.display_name
-            if buff.max_stacks > 1 and buff.stacks > 1:
-                buff_text += f"({buff.stacks})"
-            
-            # 根据是增益(Buff)还是减益(Debuff)选择不同颜色
+            if buff.max_stacks > 1 and buff.stacks > 1: buff_text += f"({buff.stacks})"
             color = (255, 80, 80) if buff.is_debuff else (80, 255, 80)
-            
-            # 绘制文本并记录其位置和对象，用于悬停检测
             text_surf = fonts['small'].render(buff_text, True, color)
             text_rect = text_surf.get_rect(left=current_x, top=rect.top + 200)
             surface.blit(text_surf, text_rect)
             ui_elements['buffs'].append((text_rect, buff))
             current_x += text_rect.width
-
-            # 绘制分隔符
             if i < len(visible_buffs) - 1:
                 separator_surf = fonts['small'].render(" | ", True, TEXT_COLOR)
                 surface.blit(separator_surf, (current_x, rect.top + 200))
                 current_x += separator_surf.get_width()
-
-    # 我们不再需要调用 draw_buff_icons 了
-    # buff_elements = draw_buff_icons(surface, char, rect.left + 20, rect.top + 205)
-    # ui_elements['buffs'].extend(buff_elements)
-
+    
     return ui_elements
 
 # ... (BattleLog 和 TooltipManager 保持不变) ...

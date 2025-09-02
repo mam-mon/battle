@@ -11,25 +11,42 @@ from ui import Button
 
 NODE_STYLE = {"start": {"color": (100, 255, 100)},"combat": {"color": (200, 200, 200)}, "event": {"color": (255, 255, 100)},"treasure": {"color": (255, 215, 0)},"elite": {"color": (255, 50, 50)},"boss": {"color": (160, 32, 240)},"rest": {"color": (100, 200, 255)},"shop": {"color": (100, 255, 200)},"forge": {"color": (150, 150, 150)}}
 
-class DungeonScreen(BaseState):
-    # 在 states/dungeon_screen.py 文件中
+# File: states/dungeon_screen.py
 
-    def __init__(self, game):
+class DungeonScreen(BaseState):
+    def __init__(self, game, dungeon_id="sunstone_ruins", floor_number=1):
         super().__init__(game)
+
+        self.dungeon_id = dungeon_id
+        self.floor_number = floor_number
+        self.dungeon_data = self.game.dungeon_data[dungeon_id]
+
+        # Find the correct data pool for the current floor
+        self.current_floor_data = None
+        for pool in self.dungeon_data.get("floor_pools", []):
+            if self.floor_number in pool["floors"]:
+                self.current_floor_data = pool
+                break
+
         self.floor = Floor()
-        # <-- 核心修改：确保这里请求的房间数是你想要的（10个以内） -->
-        self.floor.generate_floor(num_rooms=8) 
-        
+        # Pass the floor data to the generator
+        self.floor.generate_floor(num_rooms=8, floor_data=self.current_floor_data)
+
         self.player = Player(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
         self.player_group = pygame.sprite.GroupSingle(self.player)
-        self.monster_group = pygame.sprite.Group()
-        self.chest_group = pygame.sprite.GroupSingle()
+        self.monster_group, self.chest_group = pygame.sprite.Group(), pygame.sprite.GroupSingle()
         self.door_rects, self.exit_portal_button = {}, None
         self.current_room = self.floor.start_room
         self._enter_room(self.current_room)
-        
+
+        # UI Buttons
         backpack_button_rect = pygame.Rect(SCREEN_WIDTH - 160, 10, 140, 50)
         self.backpack_button = Button(backpack_button_rect, "背包 (B)", self.game.fonts['small'])
+
+        talents_button_rect = pygame.Rect(backpack_button_rect.left - 150, 10, 140, 50)
+        self.talents_button = Button(talents_button_rect, "天赋 (T)", self.game.fonts['small'])
+
+    # 文件: states/dungeon_screen.py (替换这个函数)
 
     def _enter_room(self, room):
         self.current_room = room
@@ -37,11 +54,11 @@ class DungeonScreen(BaseState):
             self.exit_portal_button = None
         print(f"进入房间 ({room.x}, {room.y}), 类型: {room.type}")
 
-        # --- 核心改动：根据房间类型执行不同逻辑 ---
+        # --- 核心改动在这里 ---
         room_type = self.current_room.type
         is_cleared = self.current_room.is_cleared
 
-        # 只有未清理过的特殊房间才会触发事件
+        # 只有未清理过的特殊房间才会触发一次性事件
         if not is_cleared:
             if room_type == "event":
                 from .event_screen import EventScreen
@@ -50,10 +67,15 @@ class DungeonScreen(BaseState):
             elif room_type == "shop":
                 from .shop_screen import ShopScreen
                 self.game.state_stack.append(ShopScreen(self.game, self.current_room))
+            
+            # --- 新增的分支 ---
+            elif room_type == "rest":
+                from .rest_screen import RestScreen # 导入我们刚创建的休息界面
+                # 弹出休息界面，并把当前房间信息传过去
+                self.game.state_stack.append(RestScreen(self.game, self.current_room))
 
         self._sync_sprites()
         self.door_rects = self._generate_doors()
-
 
     def _generate_doors(self):
         if not self.current_room.is_cleared: return {}
@@ -63,7 +85,47 @@ class DungeonScreen(BaseState):
         if self.current_room.doors["W"]: doors["W"] = pygame.Rect(0, SCREEN_HEIGHT/2 - door_size/2, margin, door_size)
         if self.current_room.doors["E"]: doors["E"] = pygame.Rect(SCREEN_WIDTH - margin, SCREEN_HEIGHT/2 - door_size/2, margin, door_size)
         return doors
+
+    # 文件: states/dungeon_screen.py
+# 在 DungeonScreen 类中添加这个新方法
+
+    def handle_event(self, event):
+        """处理地牢界面中的所有玩家输入事件"""
+        from .backpack import BackpackScreen
+        from .talents_screen import TalentsScreen
         
+        # 1. 处理UI按钮的点击
+        if self.backpack_button.handle_event(event):
+            self.game.state_stack.append(BackpackScreen(self.game))
+            return # 处理完就退出，避免后续冲突
+            
+        if self.talents_button.handle_event(event):
+            self.game.state_stack.append(TalentsScreen(self.game))
+            return
+        
+        # 处理通往下层的传送门按钮
+        if self.exit_portal_button and self.exit_portal_button.handle_event(event):
+            print("进入下一层！")
+            next_floor_number = self.floor_number + 1
+            self.game.state_stack.pop()
+            self.game.state_stack.append(DungeonScreen(self.game, self.dungeon_id, next_floor_number))
+            return
+
+        # 2. 处理键盘快捷键
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_b:
+                self.game.state_stack.append(BackpackScreen(self.game))
+            elif event.key == pygame.K_t:
+                self.game.state_stack.append(TalentsScreen(self.game))
+        
+        # 3. 处理对游戏世界中物体的点击（例如宝箱）
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # 检查是否点击了宝箱
+            for chest in self.chest_group:
+                if chest.rect.collidepoint(event.pos):
+                    self._open_treasure_chest(chest)
+                    break # 点击一个宝箱后就不用再检查其他了
+                    
     def _sync_sprites(self):
         self.monster_group.empty()
         self.chest_group.empty()
@@ -76,20 +138,24 @@ class DungeonScreen(BaseState):
                 self.chest_group.add(TreasureChest(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
 
     def _open_treasure_chest(self, chest_sprite):
-        """打开宝箱，并根据品质概率生成两个选项"""
+        """打开宝箱，并根据当前楼层配置(JSON)生成选项"""
         print("打开宝-箱！")
         
-        # 1. 定义品质掉落权重
-        rarity_weights = {
-            "common": 65,
-            "uncommon": 25,
-            "rare": 8,
-            "epic": 2,
-            "legendary": 0.5,
-            "mythic": 0.1
-        }
+        # --- 核心逻辑：从当前楼层数据中，读取宝箱的配置 ---
+        # self.current_floor_data 是在 __init__ 中从JSON加载的
+        if not self.current_floor_data or "treasure_loot" not in self.current_floor_data:
+            print("错误：在dungeon_data.json中未找到当前楼层的 treasure_loot 配置！")
+            # 即使出错，也要清理现场，防止玩家卡住
+            self.current_room.is_cleared = True
+            self.door_rects = self._generate_doors()
+            chest_sprite.kill()
+            return
+
+        loot_config = self.current_floor_data["treasure_loot"]
+        rarity_weights = loot_config.get("rarity_weights", {"common": 100})
+        item_count = loot_config.get("item_count", 2)
         
-        # 2. 创建一个所有装备的“数据库”，按品质分类
+        # 1. 创建一个所有装备的“数据库”，按品质分类
         item_pool = {rarity: [] for rarity in rarity_weights.keys()}
         all_item_classes = [getattr(Equips, name) for name in dir(Equips) if 
                             isinstance(getattr(Equips, name), type) and 
@@ -97,55 +163,38 @@ class DungeonScreen(BaseState):
                             getattr(Equips, name) is not Equips.Equipment]
         
         for item_class in all_item_classes:
-            # 实例化一个临时对象来获取它的品质
             temp_item = item_class()
             if hasattr(temp_item, 'rarity') and temp_item.rarity in item_pool:
                 item_pool[temp_item.rarity].append(item_class)
 
-        # 3. 根据权重，随机选择两个品质
+        # 2. 根据从JSON读来的权重，随机选择品质
         rarities_to_spawn = random.choices(
             list(rarity_weights.keys()), 
             weights=list(rarity_weights.values()), 
-            k=2 # 随机选两次
+            k=item_count
         )
 
-        # 4. 从对应品质的池子里，随机挑选物品
+        # 3. 从对应品质的池子里，随机挑选物品
         choices = []
         for rarity in rarities_to_spawn:
-            # 如果该品质的池子不为空，就从中选一个
-            if item_pool[rarity]:
+            if item_pool.get(rarity):
                 item_class = random.choice(item_pool[rarity])
                 choices.append(item_class())
 
-        # 确保我们至少有一个选项，并避免两个选项完全一样
-        if not choices: print("错误: 物品池为空！"); return
-        while len(choices) < 2:
-            # 如果只生成了一个，就再补一个普通的
-            if item_pool["common"]:
-                choices.append(random.choice(item_pool["common"])())
-            else: # 如果连普通都没有，就复制第一个
-                choices.append(choices[0].__class__())
+        # 4. 如果未能生成任何物品，则给出提示并退出
+        if not choices:
+            print("错误: 物品池为空或未能根据规则生成任何物品！")
+            self.current_room.is_cleared = True
+            self.door_rects = self._generate_doors()
+            chest_sprite.kill()
+            return
 
         # 5. 弹出选择界面
         from .choice_screen import ChoiceScreen
         self.game.state_stack.append(ChoiceScreen(self.game, choices, self.current_room))
         
         chest_sprite.kill()
-
-    def handle_event(self, event):
-        from .backpack import BackpackScreen
-        if self.backpack_button.handle_event(event) or \
-           (event.type == pygame.KEYDOWN and event.key == pygame.K_b):
-            self.game.state_stack.append(BackpackScreen(self.game)); return
-            
-        if self.exit_portal_button and self.exit_portal_button.handle_event(event):
-            print("进入下一层！"); self.__init__(self.game); return
-            
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            chest = self.chest_group.sprite
-            if chest and chest.rect.collidepoint(event.pos):
-                self._open_treasure_chest(chest)
-
+        
     def on_monster_defeated(self, defeated_monster_uid):
         self.current_room.monsters = [m for m in self.current_room.monsters if m['uid'] != defeated_monster_uid]
         self._sync_sprites()
@@ -188,7 +237,9 @@ class DungeonScreen(BaseState):
         if self.exit_portal_button: self.exit_portal_button.draw(surface)
         self.monster_group.draw(surface); self.chest_group.draw(surface)
         self.player_group.draw(surface)
-        self._draw_minimap(surface); self.backpack_button.draw(surface)
+        self._draw_minimap(surface)
+        self.backpack_button.draw(surface)
+        self.talents_button.draw(surface) # <-- 新增：绘制天赋按钮
         
     def _draw_minimap(self, surface):
         minimap_rect = pygame.Rect(10, 10, 230, 230)

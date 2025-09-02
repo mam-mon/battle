@@ -114,10 +114,14 @@ class StoryScreen(BaseState):
         # 检查当前对话行是否有action
         if self.dialogue_index < len(dialogue_list):
             current_dialogue = dialogue_list[self.dialogue_index]
+            # 文件: states/story.py (_advance_dialogue 方法内)
             action = current_dialogue.get("action")
             if action == "start_trial":
                 self.game.state_stack.pop()
-                self.game.state_stack.append(DungeonScreen(self.game))
+                # --- 核心修改在这里 ---
+                # 旧代码: self.game.state_stack.append(DungeonScreen(self.game))
+                # 新代码：明确告诉DungeonScreen要加载哪个地牢的第1层
+                self.game.state_stack.append(DungeonScreen(self.game, "sunstone_ruins", 1))
                 return
 
         # 推进到下一句对话

@@ -64,8 +64,29 @@ class WoodenSword(Equipment):
         if actual_dmg <= wearer.base_attack:
             self._count += 1
 
+class WoodenSword_Star(Equipment):
+    """木剑⭐：武器插槽；+6 攻击；现在每攻击 2 次，第 3 次普攻造成双倍伤害。"""
+    slot = "weapon"
+    display_name = "木剑⭐"
+    
+    def __init__(self):
+        self.type = "weapon"
+        self.rarity = "uncommon" # 升级后，品质也提升了
+        self.atk_bonus = 6       # 基础攻击更高
+        self._count = 0
+
+    def before_attack(self, wearer, target, packet: DamagePacket):
+        # 效果增强：从3次触发改为2次触发
+        if self._count >= 2:
+            packet.amount *= 2
+            self._count = 0
+
+    def after_attack(self, wearer, target, actual_dmg):
+        # 这里的dmg是造成伤害后的最终数值，可以直接使用
+        self._count += 1
+
 class WoodenArmor(Equipment):
-    """木铠甲：护甲插槽；+2 防御；50% 概率额外减免 2 点物理伤害"""
+    """木铠甲：护甲插槽；+2 防御；30% 概率额外减免 30% 点物理伤害"""
     slot = "armor"
     display_name    = "木铠甲"
 
@@ -78,8 +99,23 @@ class WoodenArmor(Equipment):
 
     def before_take_damage(self, wearer, packet: DamagePacket):
         # 效果现在只对物理伤害生效
+        if packet.damage_type == DamageType.PHYSICAL and random.random() < 0.3:
+            packet.amount = max(0, packet.amount * 0.7)
+
+class WoodenArmor_Star(Equipment):
+    """木铠甲⭐：护甲插槽；+5 防御；50% 概率额外减免 50% 点物理伤害"""
+    slot = "armor"
+    display_name = "木铠甲⭐"
+
+    def __init__(self):
+        self.type = "armor"
+        self.rarity = "uncommon"
+        self.def_bonus = 5 # 基础防御更高
+
+    def before_take_damage(self, wearer, packet: DamagePacket):
+        # 效果现在只对物理伤害生效
         if packet.damage_type == DamageType.PHYSICAL and random.random() < 0.5:
-            packet.amount = max(0, packet.amount - 2)
+            packet.amount = max(0, packet.amount * 0.5)
 
 class IronSword(Equipment):
     """铁剑：武器插槽；+5 攻击；基础 +5% 暴击率；未暴击时，下次普攻暴击率 +5%，最多 8 层；暴击后清除"""
@@ -239,9 +275,6 @@ class Stormcaller(Equipment):
             self._attack_count = 0
             print("[风暴召唤者] 附加了风暴印记！")
             target.add_debuff(Buffs.StormDebuff(), source=wearer)
-
-# 在 Equips.py 文件末尾添加
-
 # --- 白色 (Common) 品质新装备 ---
 
 class LeatherGloves(Equipment):
@@ -291,16 +324,108 @@ class TowerShield(Equipment):
 
 # --- 蓝色 (Rare) 品质新装备 ---
 
+
 class AdventurersPouch(Equipment):
     """冒险家的钱袋：饰品槽；每拥有20金币，就为你提供+1攻击力。（战斗开始时结算）"""
     slot = "accessory"
     display_name = "冒险家的钱袋"
     def __init__(self):
         self.rarity, self.type = "rare", "misc"
+        self.atk_bonus = 0 # 初始攻击力加成为0
+
     def on_battle_start(self, wearer):
-        # 假设玩家的金币存储在 game.player 对象上
+        # 在战斗开始时，只计算应该加多少攻击力，并存到自己的属性里
         gold = getattr(wearer, 'gold', 0)
-        bonus_atk = gold // 20
-        if bonus_atk > 0:
-            print(f"[冒险家的钱袋] 你获得了 {bonus_atk} 点额外攻击力！")
-            wearer.attack += bonus_atk
+        self.atk_bonus = gold // 20
+        if self.atk_bonus > 0:
+            print(f"[冒险家的钱袋] 你获得了 {self.atk_bonus} 点额外攻击力！")
+            # 重新计算一次总属性，让这个新的atk_bonus生效
+            wearer.recalculate_stats()
+
+class ShadowCloak(Equipment):
+    """暗影斗篷：护甲槽；+5防御；受到暴击伤害时，有30%概率免疫该次伤害。"""
+    slot = "armor"
+    display_name = "暗影斗篷"
+    def __init__(self):
+        self.rarity, self.type = "rare", "armor"
+        self.def_bonus = 5
+        self.crit_immunity_chance = 0.3
+    def before_take_damage(self, wearer, packet: DamagePacket):
+        if packet.damage_type == DamageType.PHYSICAL and packet.is_critical:
+            if random.random() < self.crit_immunity_chance:
+                print("[暗影斗篷] 免疫了暴击伤害！")
+                packet.amount = 0
+
+# 在 Equips.py 文件末尾添加
+
+# --- “烙印”体系示例 ---
+
+class SunScorchedBlade(Equipment):
+    """日灼之刃 [武器-稀有]：攻击速度+0.5；命中时附加一层【日之烙印】。"""
+    slot, display_name = "weapon", "日灼之刃"
+    def __init__(self):
+        self.rarity, self.type = "rare", "weapon"
+        self.atk_speed_bonus = 0.5
+    def after_attack(self, wearer, target, actual_dmg):
+        target.add_debuff(Buffs.SunstoneBrandDebuff(stacks=1), source=wearer)
+
+class Avalanche(Equipment):
+    """山崩 [武器-史诗]：攻击力+20；暴击时引爆目标所有【日之烙印】，每层造成20额外真实伤害。"""
+    slot, display_name = "weapon", "山崩"
+    def __init__(self):
+        self.rarity, self.type = "epic", "weapon"
+        self.atk_bonus = 20
+    def on_critical(self, wearer, target, actual_dmg):
+        # 寻找目标身上的烙印
+        brand_debuff = next((b for b in target.buffs if isinstance(b, Buffs.SunstoneBrandDebuff)), None)
+        if brand_debuff:
+            stacks = brand_debuff.stacks
+            print(f"[山崩] 引爆了 {stacks} 层烙印！")
+            # 造成额外伤害
+            extra_dmg = stacks * 20
+            packet = DamagePacket(amount=extra_dmg, damage_type=DamageType.TRUE, source=wearer)
+            target.take_damage(packet)
+            # 移除烙印
+            target.remove_buff(brand_debuff)
+
+# --- “龙魂”体系示例 ---
+
+class DragonBloodChalice(Equipment):
+    """龙血酒杯 [饰品-史诗]：每秒失去5点生命，但获得1层【龙魂】。"""
+    slot, display_name = "accessory", "龙血酒杯"
+    def __init__(self):
+        self.rarity, self.type = "epic", "misc"
+        self._timer = 0.0
+    def on_battle_start(self, wearer):
+        self._timer = 0.0 # 重置计时器
+    def on_tick(self, wearer, dt): # 需要在 Character.update 中调用 on_tick
+        self._timer += dt
+        if self._timer >= 1.0:
+            self._timer -= 1.0
+            # 扣血
+            packet = DamagePacket(amount=5, damage_type=DamageType.TRUE, is_sourceless=True)
+            wearer.take_damage(packet)
+            # 获得龙魂
+            wearer.add_buff(Buffs.DragonSoulBuff(stacks=1))
+
+class DragonscaleWard(Equipment):
+    """龙鳞盾 [副手-稀有]：战斗开始时，消耗所有【龙魂】，每层提供15点护盾。"""
+    slot, display_name = "offhand", "龙鳞盾"
+    def __init__(self):
+        self.rarity, self.type = "rare", "armor"
+    def on_battle_start(self, wearer):
+        soul_buff = next((b for b in wearer.buffs if isinstance(b, Buffs.DragonSoulBuff)), None)
+        if soul_buff:
+            stacks = soul_buff.stacks
+            shield_gain = stacks * 15
+            print(f"[龙鳞盾] 消耗了 {stacks} 层龙魂，获得了 {shield_gain} 点护盾！")
+            wearer.shield += shield_gain
+            wearer.remove_buff(soul_buff)
+
+UPGRADE_MAP = {
+    WoodenSword: WoodenSword_Star,
+    WoodenArmor: WoodenArmor_Star,
+    # 在这里继续为你其他的装备添加升级配方...
+    # 例如:
+    # IronSword: IronSword_Star, 
+}
