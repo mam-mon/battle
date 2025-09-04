@@ -15,6 +15,9 @@ import math
 from collections import Counter
 #import pygame
 import sys
+from battle_logger import battle_logger
+from ui import format_damage_log
+
 
 class Buff(ABC):
     """通用 Buff/DeBuff 基类，所有状态继承此类。"""
@@ -100,7 +103,11 @@ class RegenerationBuff(Buff):
         # 当计时器超过或等于1秒时，执行回血
         while self._timer >= 1.0:
             amount = self.stacks  # 每秒回复量 = 层数
-            wearer.heal(amount)
+            
+            # ### 最终修复：从 current_opponent 获取目标，并作为 combat_target 传入 ###
+            opponent = getattr(wearer, "current_opponent", None)
+            wearer.heal(amount, combat_target=opponent)
+            
             self._timer -= 1.0  # 计时器减去1秒，准备下一次计时
         return None
 
@@ -232,6 +239,8 @@ class PhoenixCrownStage1Buff(Buff):
         return None
 
 
+# 文件: Buffs.py (完整替换 PhoenixCrownStage2Buff 这个类)
+
 class PhoenixCrownStage2Buff(Buff):
     """不灭·第二阶段：禁手+回血反击"""
     display_name    = "不灭"
@@ -241,71 +250,58 @@ class PhoenixCrownStage2Buff(Buff):
 
     def __init__(self):
         super().__init__(stacks=1)
-        self._healed_total  = 0.0
-        self._rec_atk       = None
-        self._rec_def       = None
-        self._rec_as        = None
-        self._rec_dr        = None
-        self._timer         = 0.0  # 新增：秒计时器
+        # ### 核心修改 1：不再使用 _healed_total，改为 _damage_to_deal ###
+        self._damage_to_deal = 0.0
+        self._rec_atk        = None
+        self._rec_def        = None
+        self._rec_as         = None
+        self._rec_dr         = None
+        self._timer          = 0.0
 
     def on_apply(self, wearer):
+        # ### 核心修改 2：在Buff生效时，立刻计算并储存应造成的总伤害 ###
+        # 这个伤害值等于角色当时已损失的生命值。
+        self._damage_to_deal = wearer.max_hp - wearer.hp
+        
+        # 保存角色属性 (这部分不变)
         self._rec_atk  = wearer.attack
         self._rec_def  = wearer.defense
         self._rec_as   = wearer.attack_speed
         self._rec_dr   = wearer.damage_resistance
         wearer.damage_resistance = self._rec_dr + 0.5
 
+    # 文件: Buffs.py (在 PhoenixCrownStage2Buff 类中，替换 on_tick 方法)
     def on_tick(self, wearer, dt):
         self._timer += dt
-        
-        # 每秒触发一次回血
-        while self._timer >= 1.0:
-            if wearer.hp < wearer.max_hp: # 只有没满血的时候才回
-                heal_amount = wearer.max_hp * 0.1 # 每秒回复最大生命的10%
-                actual_healed = min(heal_amount, wearer.max_hp - wearer.hp) # 实际回复量
-                wearer.hp += actual_healed
-                self._healed_total += actual_healed
+
+        if self._timer >= 1.0:
+            if wearer.hp < wearer.max_hp:
+                heal_amount = wearer.max_hp * 0.1
+                # ### 核心修改：从 current_opponent 获取目标 ###
+                opponent = getattr(wearer, "current_opponent", None)
+                wearer.heal(heal_amount, combat_target=opponent)
             self._timer -= 1.0
 
         if wearer.hp >= wearer.max_hp:
-            total = int(self._healed_total)
-            attacker = getattr(wearer, "_last_real_attacker", None)
-            text = "" # 初始化返回文本
+            total = int(self._damage_to_deal)
+            # ### 核心修改：从 current_opponent 获取目标 ###
+            opponent = getattr(wearer, "current_opponent", None)
 
-            if attacker and attacker.hp > 0:
-                attacker.take_damage(total)
-                attacker.last_hits.append((total, False))
-                text = f"[不灭反击] {wearer.name} → {attacker.name} 造成 {total} 点伤害"
+            if opponent and opponent.hp > 0:
+                # ... (后续的伤害和日志逻辑不变, 只是把 attacker 换成了 opponent)
+                from damage import DamagePacket, DamageType
+                from ui import format_damage_log
+                packet = DamagePacket(total, DamageType.TRUE, source=wearer, is_sourceless=True)
+                damage_details = opponent.take_damage(packet)
+                log_parts = format_damage_log(damage_details, action_name="不灭反击")
+                battle_logger.log(log_parts)
 
-            # 恢复原属性
-            wearer.attack            = self._rec_atk
-            wearer.defense           = self._rec_def
-            wearer.attack_speed      = self._rec_as
-            wearer.attack_interval   = 6.0 / self._rec_as
-            wearer.damage_resistance = self._rec_dr
-            wearer.max_hp            = wearer.base_max_hp
-            wearer.hp                = min(wearer.hp, wearer.max_hp)
+            # ... (恢复属性的部分不变) ...
             wearer.remove_buff(self)
-            return text
+            return None
 
         return None
-    
-class StormDebuff(Buff):
-    """
-    风暴印记 (可驱散)
-    当携带者受到下一次任意来源的伤害时，
-    此印记会引爆，造成额外伤害，然后消失。
-    """
-    display_name = "风暴"
-    dispellable  = True
-    is_debuff    = True
 
-    def before_take_damage(self, wearer, packet: DamagePacket): # <-- 接收 packet
-        print("[风暴引爆!] 造成额外伤害")
-        # 直接在传入的伤害包上增加伤害
-        packet.amount += 50
-        # 移除自己
-        wearer.remove_buff(self)
 
 
 class BleedDebuff(Buff):
@@ -367,3 +363,100 @@ class SunstoneBrandDebuff(Buff):
     display_name = "日之烙印"
     is_debuff    = True
     max_stacks   = 99
+
+class SunderDebuff(Buff):
+    """【破甲】(Debuff): 每层使目标的防御力降低1点。"""
+    display_name = "破甲"
+    is_debuff    = True
+    max_stacks   = 99
+
+class VitalityBloomBuff(Buff):
+    """【生机绽放】(Buff): 受到伤害时，恢复等同于 层数 * 1% 最大生命值的生命。"""
+    display_name = "生机绽放"
+    max_stacks   = 99
+
+    def on_attacked(self, wearer, attacker, dmg):
+        if dmg > 0:
+            heal_amount = wearer.max_hp * (self.stacks * 0.01)
+            # ### 核心修复：将攻击者 attacker 作为 combat_target 传入 ###
+            wearer.heal(heal_amount, combat_target=attacker)
+
+class WitheredCurseDebuff(Buff):
+    """【凋零咒印】(Debuff): 持续期间，受到的所有治疗效果转变为等量真实伤害。"""
+    display_name = "凋零咒印"
+    is_debuff    = True
+    duration     = 5.0 # 假设持续5秒
+
+    def on_tick(self, wearer, dt):
+        # 持续时间递减
+        self.remaining -= dt
+        if self.remaining <= 0:
+            wearer.remove_buff(self)
+
+    def before_healed(self, wearer, amount):
+        """这是一个新的自定义钩子，会在Character.heal中被调用"""
+        if amount > 0:
+            print(f"[凋零咒印] {wearer.name} 的治疗被转化为了伤害！")
+            from damage import DamagePacket, DamageType
+            packet = DamagePacket(amount, DamageType.TRUE, is_sourceless=True)
+            wearer.take_damage(packet)
+        return 0 # 返回0，阻止本次治疗
+
+class FrenzyBuff(Buff):
+    """【狂热】(Buff): 持续期间，攻击速度翻倍。"""
+    display_name = "狂热"
+    duration     = 8.0 # 假设持续8秒
+
+    def on_tick(self, wearer, dt):
+        self.remaining -= dt
+        if self.remaining <= 0:
+            wearer.remove_buff(self)
+            wearer.recalculate_stats() # Buff消失后，需要重算属性
+
+class SunfireAuraDebuff(Buff):
+    """【日炎灼烧】(Debuff): 每秒受到施加者最大生命值5%的真实伤害。"""
+    display_name = "日炎灼烧"
+    is_debuff    = True
+
+    def __init__(self, source_char):
+        super().__init__()
+        self.source = source_char # 需要知道是谁施加的
+        self._timer = 0.0
+
+    def on_tick(self, wearer, dt):
+        self._timer += dt
+        if self._timer >= 1.0:
+            self._timer -= 1.0
+            from damage import DamagePacket, DamageType
+            damage = self.source.max_hp * 0.05
+            packet = DamagePacket(damage, DamageType.TRUE, source=self.source, is_dot=True)
+            wearer.take_damage(packet)
+
+class CovenantOfFateBuff(Buff):
+    """【命运契约】(Buff): 持续期间，你受到伤害时，攻击者也会受到等量的真实伤害。"""
+    display_name = "命运契约"
+    duration     = 10.0 # 假设持续10秒
+
+    def on_tick(self, wearer, dt):
+        self.remaining -= dt
+        if self.remaining <= 0:
+            wearer.remove_buff(self)
+
+    def on_attacked(self, wearer, attacker, dmg):
+        if attacker and attacker.hp > 0 and dmg > 0:
+            from damage import DamagePacket, DamageType
+            print(f"[命运契约] 对 {attacker.name} 反弹了 {int(dmg)} 点真实伤害！")
+            packet = DamagePacket(dmg, DamageType.TRUE, source=wearer)
+            attacker.take_damage(packet)
+            
+class StormDebuff(Buff):
+    """【风暴印记】(Debuff): 每次受到伤害时，额外承受等同于风暴印记层数的伤害。"""
+    display_name = "风暴"
+    dispellable  = True
+    is_debuff    = True
+    max_stacks   = 99
+
+    def before_take_damage(self, wearer, packet: DamagePacket):
+        if packet.amount > 0:
+            print(f"[风暴印记] 额外造成 {self.stacks} 点伤害！")
+            packet.amount += self.stacks

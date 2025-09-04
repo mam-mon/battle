@@ -28,9 +28,6 @@ class LootScreen(BaseState):
             panel_w, panel_h
         )
         self._process_rewards()
-        # ------------------------------------
-
-        self._process_rewards()
 
     def _process_rewards(self):
         self.exp_messages = []
@@ -41,19 +38,25 @@ class LootScreen(BaseState):
         self.loot_messages = self._generate_loot()
         self.game.save_to_slot(0)
         
+    # 文件: states/loot.py (替换这个函数)
 
+    # 文件: states/loot.py (替换这个函数)
 
     def _generate_loot(self):
         messages = []
         found_any_loot = False
-
-        # --- Part 1: 装备掉落逻辑 (现在使用 self.defeated_enemy_id) ---
-        if self.defeated_enemy_id: # 确保ID存在
+        
+        # --- Part 1: 装备掉落逻辑 ---
+        if self.defeated_enemy_id:
             equipment_drops = self.game.loot_data.get(self.defeated_enemy_id, [])
             if equipment_drops:
-                messages.append("--- 战利品 ---")
+                equipment_header_added = False
                 for drop_info in equipment_drops:
                     if random.random() < drop_info.get("chance", 1.0):
+                        if not equipment_header_added:
+                            messages.append("--- 战利品 ---")
+                            equipment_header_added = True
+                        
                         found_any_loot = True
                         item_class_name = drop_info["item_class_name"]
                         try:
@@ -68,30 +71,27 @@ class LootScreen(BaseState):
                         except AttributeError:
                             messages.append(f"错误：未找到物品 {item_class_name}。")
 
-        # --- Part 2: 全新的、更精确的天赋掉落逻辑 ---
+        # --- Part 2: 天赋掉落逻辑 ---
         import Talents
-
-        # 直接从传递过来的敌人对象中获取它实际拥有的天赋列表！
         if self.defeated_enemy_object and self.defeated_enemy_object.equipped_talents:
-            messages.append("--- 能力领悟 ---")
-
-            # 遍历这个敌人在战斗中真正拥有的每一个天赋
+            talent_header_added = False
             for possessed_talent in self.defeated_enemy_object.equipped_talents:
-                # 在这里设置一个固定的天赋掉落率，比如 15%
-                TALENT_DROP_CHANCE = 0.15 
-
-                if random.random() < TALENT_DROP_CHANCE:
-                    # 尝试让玩家学习这个天赋
+                
+                # --- 核心修复：在处理前，先确保这个槽位里的天赋不是空的 (None) ---
+                if possessed_talent and random.random() < 0.15: # 15% 的掉落率
                     was_new = self.game.player.learn_talent(possessed_talent)
-
                     if was_new:
+                        if not talent_header_added:
+                            messages.append("--- 能力领悟 ---")
+                            talent_header_added = True
+                            
                         found_any_loot = True
                         messages.append(f"你从敌人身上领悟了「{possessed_talent.display_name}」！")
 
         # --- Part 3: 最终总结 ---
         if not found_any_loot:
             messages.append("敌人没有留下任何有价值的东西。")
-
+            
         return messages
 
     def handle_event(self, event):

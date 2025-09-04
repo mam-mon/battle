@@ -1,5 +1,4 @@
-
-# states/shop_screen.py (现代化重写版本，已补全)
+# states/shop_screen.py (现代化重写版本)
 import pygame
 import random
 import math
@@ -8,19 +7,6 @@ from .base import BaseState
 from ui import Button, TooltipManager
 from settings import *
 import Equips
-
-# 安全获取 RARITY_COLORS（防止 settings 未定义时崩溃）
-_DEFAULT_RARITY_COLORS = {
-    "common": (180, 180, 180),
-    "uncommon": (80, 200, 120),
-    "rare": (80, 160, 255),
-    "epic": (180, 80, 255),
-    "legendary": (255, 180, 60),
-}
-try:
-    RARITY_COLORS = dict(RARITY_COLORS)  # type: ignore
-except Exception:
-    RARITY_COLORS = _DEFAULT_RARITY_COLORS
 
 RARITY_PRICES = {"common": 50, "uncommon": 100, "rare": 250, "epic": 500, "legendary": 1000}
 
@@ -35,12 +21,12 @@ class ShopScreen(BaseState):
         
         # 动画系统
         self.hover_animations = {}
-        self.glow_animation = 0.0
-        self.entrance_animation = 0.0
+        self.glow_animation = 0
+        self.entrance_animation = 0
         self.coin_particles = []
         self.card_bounce_offsets = []
         
-        self.tooltip_manager = TooltipManager(self._get_font('small', 16))
+        self.tooltip_manager = TooltipManager(self.game.fonts['small'])
         
         self._generate_inventory()
         self._setup_ui()
@@ -50,7 +36,7 @@ class ShopScreen(BaseState):
         try:
             if hasattr(self.game, 'fonts') and font_name in self.game.fonts:
                 return self.game.fonts[font_name]
-        except Exception:
+        except:
             pass
         return pygame.font.Font(None, default_size)
 
@@ -61,14 +47,14 @@ class ShopScreen(BaseState):
                            and issubclass(getattr(Equips, name), Equips.Equipment) 
                            and getattr(Equips, name) is not Equips.Equipment]
         
-        choices = random.sample(all_item_classes, min(4, len(all_item_classes)))  # 4个商品
+        choices = random.sample(all_item_classes, min(4, len(all_item_classes)))  # 增加到4个商品
         
         for item_class in choices:
             item = item_class()
             rarity = getattr(item, 'rarity', 'common')
             base_price = RARITY_PRICES.get(rarity, 9999)
             # 添加价格波动
-            price_variation = random.uniform(0.85, 1.15)
+            price_variation = random.uniform(0.8, 1.2)
             price = int(base_price * price_variation)
             self.shop_items.append([None, item, price, False])
 
@@ -113,18 +99,18 @@ class ShopScreen(BaseState):
             card_y = cards_start_y + row * (card_height + spacing)
             card_rect = pygame.Rect(card_x, card_y, card_width, card_height)
             
-            button = Button(card_rect, "", self._get_font('normal', 20))
+            button = Button(card_rect, "", self._get_font('normal'))
             item_tuple[0] = button
             
             # 初始化动画
-            self.hover_animations[i] = 0.0
+            self.hover_animations[i] = 0
             self.card_bounce_offsets.append(random.uniform(0, math.pi * 2))  # 随机相位
         
         # 离开按钮
         leave_rect = pygame.Rect(self.panel_rect.centerx - 100, 
                                 self.panel_rect.bottom - 60, 200, 45)
-        self.leave_button = Button(leave_rect, "离开商店", self._get_font('normal', 20))
-        self.hover_animations['leave'] = 0.0
+        self.leave_button = Button(leave_rect, "离开商店", self._get_font('normal'))
+        self.hover_animations['leave'] = 0
 
     def handle_event(self, event):
         """处理事件"""
@@ -154,8 +140,7 @@ class ShopScreen(BaseState):
                         self.game.state_stack.append(NotificationScreen(self.game, feedback))
                     
                     self.feedback_message = f"成功购买 {getattr(item, 'display_name', '物品')}！"
-                    # 将该商品标记为已售出
-                    self.shop_items[i][3] = True
+                    self.shop_items[self.shop_items.index([button, item, price, is_sold])][3] = True
                 else:
                     self.feedback_message = "金币不足！"
                     
@@ -164,15 +149,15 @@ class ShopScreen(BaseState):
 
     def _create_coin_particles(self, center):
         """创建金币粒子效果"""
-        for _ in range(18):
+        for _ in range(15):
             particle = {
-                'x': center[0] + random.uniform(-15, 15),
-                'y': center[1] + random.uniform(-10, 10),
-                'vx': random.uniform(-3.2, 3.2),
-                'vy': random.uniform(-6, -2),
+                'x': center[0] + random.uniform(-20, 20),
+                'y': center[1] + random.uniform(-20, 20),
+                'vx': random.uniform(-3, 3),
+                'vy': random.uniform(-5, -1),
                 'life': 60,
                 'max_life': 60,
-                'size': random.uniform(3, 7)
+                'size': random.uniform(3, 8)
             }
             self.coin_particles.append(particle)
 
@@ -196,7 +181,7 @@ class ShopScreen(BaseState):
         for particle in self.coin_particles[:]:
             particle['x'] += particle['vx']
             particle['y'] += particle['vy']
-            particle['vy'] += 0.22  # 重力
+            particle['vy'] += 0.2  # 重力
             particle['life'] -= 1
             if particle['life'] <= 0:
                 self.coin_particles.remove(particle)
@@ -208,16 +193,16 @@ class ShopScreen(BaseState):
         # 检查商品卡片悬停
         for i, (button, item, price, is_sold) in enumerate(self.shop_items):
             if button.rect.collidepoint(mouse_pos) and not is_sold:
-                self.hover_animations[i] = min(1.0, self.hover_animations[i] + dt_sec * 4.0)
+                self.hover_animations[i] = min(1.0, self.hover_animations[i] + dt_sec * 4)
                 hovered_item = item
             else:
-                self.hover_animations[i] = max(0.0, self.hover_animations[i] - dt_sec * 3.0)
+                self.hover_animations[i] = max(0, self.hover_animations[i] - dt_sec * 3)
         
         # 检查离开按钮悬停
         if self.leave_button.rect.collidepoint(mouse_pos):
-            self.hover_animations['leave'] = min(1.0, self.hover_animations['leave'] + dt_sec * 4.0)
+            self.hover_animations['leave'] = min(1.0, self.hover_animations['leave'] + dt_sec * 4)
         else:
-            self.hover_animations['leave'] = max(0.0, self.hover_animations['leave'] - dt_sec * 3.0)
+            self.hover_animations['leave'] = max(0, self.hover_animations['leave'] - dt_sec * 3)
         
         # 更新tooltip
         self.tooltip_manager.update(hovered_item)
@@ -306,52 +291,33 @@ class ShopScreen(BaseState):
         for i, (button, item, price, is_sold) in enumerate(self.shop_items):
             # 计算入场动画偏移
             entrance_delay = i * 0.1
-            entrance_progress = max(0.0, min(1.0, (self.entrance_animation - entrance_delay) / 0.8))
-            entrance_offset = (1.0 - entrance_progress) * 50.0
+            entrance_progress = max(0, min(1, (self.entrance_animation - entrance_delay) / 0.8))
+            entrance_offset = (1 - entrance_progress) * 50
             
             # 计算浮动偏移
             bounce_phase = self.card_bounce_offsets[i] + current_time * 0.001
-            bounce_offset = math.sin(bounce_phase) * 2.0 if not is_sold else 0.0
+            bounce_offset = math.sin(bounce_phase) * 2 if not is_sold else 0
             
             # 调整卡片位置
             card_rect = button.rect.copy()
-            card_rect.y += int(entrance_offset + bounce_offset)
+            card_rect.y += entrance_offset + bounce_offset
             
             # 绘制商品卡片
             hover_alpha = self.hover_animations[i]
             self._draw_item_card(surface, card_rect, item, price, is_sold, hover_alpha)
-
-    def _wrap_text(self, font, text, max_width, max_lines=None):
-        """基于像素宽度的简单自动换行，返回行列表"""
-        words = text.split()
-        lines = []
-        cur = ""
-        for w in words:
-            test = (cur + " " + w).strip()
-            if font.size(test)[0] <= max_width:
-                cur = test
-            else:
-                if cur:
-                    lines.append(cur)
-                cur = w
-                if max_lines and len(lines) >= max_lines:
-                    break
-        if cur and (not max_lines or len(lines) < max_lines):
-            lines.append(cur)
-        return lines
 
     def _draw_item_card(self, surface, rect, item, price, is_sold, hover_alpha):
         """绘制单个商品卡片"""
         # 获取物品信息
         name = getattr(item, 'display_name', '未知物品')
         rarity = getattr(item, 'rarity', 'common')
-        rarity_color = RARITY_COLORS.get(rarity, RARITY_COLORS.get('common', (180,180,180)))
+        rarity_color = RARITY_COLORS.get(rarity, RARITY_COLORS['common'])
         
         # 卡片状态
         if is_sold:
             bg_alpha = 60
             border_alpha = 80
-            text_color = (200, 200, 200)
+            text_color = (120, 120, 120)
             scale = 0.95
         else:
             bg_alpha = int(140 + hover_alpha * 40)
@@ -360,22 +326,21 @@ class ShopScreen(BaseState):
             scale = 1.0 + hover_alpha * 0.03
         
         # 缩放效果
-        target_rect = rect
         if scale != 1.0:
             scaled_size = (int(rect.width * scale), int(rect.height * scale))
             scaled_rect = pygame.Rect(0, 0, *scaled_size)
             scaled_rect.center = rect.center
-            target_rect = scaled_rect
+            rect = scaled_rect
         
         # 卡片背景
         card_color = (*rarity_color, bg_alpha) if not is_sold else (60, 60, 60, bg_alpha)
         border_color = (*rarity_color, border_alpha) if not is_sold else (80, 80, 80, border_alpha)
         
-        pygame.draw.rect(surface, card_color, target_rect, border_radius=12)
-        pygame.draw.rect(surface, border_color, target_rect, width=3, border_radius=12)
+        pygame.draw.rect(surface, card_color, rect, border_radius=12)
+        pygame.draw.rect(surface, border_color, rect, width=3, border_radius=12)
         
         # 稀有度装饰
-        decoration_rect = pygame.Rect(target_rect.x, target_rect.y, target_rect.width, 8)
+        decoration_rect = pygame.Rect(rect.x, rect.y, rect.width, 8)
         decoration_color = rarity_color if not is_sold else (80, 80, 80)
         pygame.draw.rect(surface, decoration_color, decoration_rect, 
                         border_top_left_radius=12, border_top_right_radius=12)
@@ -383,16 +348,16 @@ class ShopScreen(BaseState):
         # 发光效果（悬停且未售出）
         if hover_alpha > 0 and not is_sold:
             glow_intensity = int((math.sin(self.glow_animation) + 1) * hover_alpha * 25 + 15)
-            glow_surface = pygame.Surface(target_rect.size, pygame.SRCALPHA)
+            glow_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
             pygame.draw.rect(glow_surface, (*rarity_color, glow_intensity), 
-                           (0, 0, target_rect.width, target_rect.height), border_radius=12)
-            surface.blit(glow_surface, target_rect.topleft)
+                           (0, 0, rect.width, rect.height), border_radius=12)
+            surface.blit(glow_surface, rect.topleft)
         
         # 已售出标记
         if is_sold:
             sold_font = self._get_font('large', 28)
             sold_text = sold_font.render("已售罄", True, (255, 100, 100))
-            sold_rect = sold_text.get_rect(center=target_rect.center)
+            sold_rect = sold_text.get_rect(center=rect.center)
             
             # 半透明背景
             sold_bg = sold_rect.inflate(30, 15)
@@ -403,14 +368,15 @@ class ShopScreen(BaseState):
         
         # 物品名称
         name_font = self._get_font('normal', 18)
+        # 处理长名称
         display_name = name
-        if name_font.size(display_name)[0] > target_rect.width - 20:
-            while name_font.size(display_name + "...")[0] > target_rect.width - 20 and len(display_name) > 1:
+        if name_font.size(display_name)[0] > rect.width - 20:
+            while name_font.size(display_name + "...")[0] > rect.width - 20 and len(display_name) > 1:
                 display_name = display_name[:-1]
             display_name += "..."
         
         name_surface = name_font.render(display_name, True, text_color)
-        name_rect = name_surface.get_rect(centerx=target_rect.centerx, top=target_rect.top + 18)
+        name_rect = name_surface.get_rect(centerx=rect.centerx, top=rect.top + 20)
         
         # 名称背景
         name_bg_rect = name_rect.inflate(16, 6)
@@ -419,94 +385,19 @@ class ShopScreen(BaseState):
         
         # 稀有度标签
         rarity_font = self._get_font('small', 14)
-        rarity_text = str(rarity).upper()
+        rarity_text = rarity.upper()
         rarity_surface = rarity_font.render(rarity_text, True, rarity_color)
-        rarity_rect = rarity_surface.get_rect(centerx=target_rect.centerx, top=name_rect.bottom + 6)
+        rarity_rect = rarity_surface.get_rect(centerx=rect.centerx, top=name_rect.bottom + 8)
         surface.blit(rarity_surface, rarity_rect)
         
         # 分割线
-        line_y = rarity_rect.bottom + 10
+        line_y = rarity_rect.bottom + 12
         pygame.draw.line(surface, (100, 100, 100), 
-                        (target_rect.x + 15, line_y), (target_rect.right - 15, line_y), 1)
+                        (rect.x + 15, line_y), (rect.right - 15, line_y), 1)
         
-        # 物品描述（基于 docstring 的简要信息）
-        description = inspect.getdoc(item) or getattr(item, 'description', '') or "神秘的装备"
-        desc_words = description.split()
-        # 限制字数并自动换行
-        desc_text = " ".join(desc_words[:40]) + ("..." if len(desc_words) > 40 else "")
-        desc_area = pygame.Rect(target_rect.x + 14, line_y + 8, target_rect.width - 28, target_rect.height - (line_y + 8) - 80)
-        desc_font = self._get_font('small', 14)
-        lines = self._wrap_text(desc_font, desc_text, desc_area.width, max_lines=5)
-        y = desc_area.y
-        for ln in lines:
-            surf = desc_font.render(ln, True, (220, 220, 220))
-            surface.blit(surf, (desc_area.x, y))
-            y += desc_font.get_height() + 2
+        # 物品描述（简化版）
+        description = inspect.getdoc(item) or "神秘的装备"
+        desc_words = description.split()[:12]  # 限制字数
+        short_desc = " ".join(desc_words) + ("..." if len(description.split()) > 12 else "")
         
-        # 底部价格按钮区
-        price_area = pygame.Rect(target_rect.x + 12, target_rect.bottom - 64, target_rect.width - 24, 50)
-        if self.game.player.gold < price:
-            btn_bg = (40, 30, 30, 160)
-            btn_border = (150, 80, 80)
-            price_text = f"金币不足（{price} G）"
-            price_color = (230, 120, 120)
-        else:
-            # 悬停增强
-            hover = hover_alpha if hover_alpha > 0 else 0.0
-            base_alpha = 160 + int(60 * hover)
-            btn_bg = (30, 40, 30, base_alpha)
-            btn_border = (80, 200, 120)
-            price_text = f"购买（{price} G）"
-            price_color = (200, 255, 200)
-        
-        # 绘制按钮感
-        pygame.draw.rect(surface, btn_bg, price_area, border_radius=10)
-        pygame.draw.rect(surface, btn_border, price_area, width=2, border_radius=10)
-        
-        price_font = self._get_font('normal', 20)
-        price_surf = price_font.render(price_text, True, price_color)
-        price_rect = price_surf.get_rect(center=price_area.center)
-        surface.blit(price_surf, price_rect)
-        
-        # 购买提示
-        hint_font = self._get_font('small', 14)
-        hint_text = "点击卡片以购买" if self.game.player.gold >= price else "去冒险赚点钱吧"
-        hint_surf = hint_font.render(hint_text, True, (180, 180, 180))
-        hint_rect = hint_surf.get_rect(midtop=(price_area.centerx, price_area.bottom + 2))
-        surface.blit(hint_surf, hint_rect)
-
-    def _draw_leave_button(self, surface):
-        rect = self.leave_button.rect.copy()
-        hover = self.hover_animations.get('leave', 0.0)
-        bg = (35, 45, 70, int(200 + 40 * hover))
-        border = (120, 140, 170)
-        text_color = (255, 255, 255)
-        
-        # 背景
-        pygame.draw.rect(surface, bg, rect, border_radius=10)
-        pygame.draw.rect(surface, border, rect, width=2, border_radius=10)
-        
-        # 文本
-        font = self._get_font('normal', 22)
-        txt = font.render("离开商店", True, text_color)
-        surface.blit(txt, txt.get_rect(center=rect.center))
-
-    def _draw_feedback(self, surface, panel_rect):
-        if not self.feedback_message:
-            return
-        msg_font = self._get_font('small', 18)
-        msg_surf = msg_font.render(self.feedback_message, True, (255, 230, 150))
-        msg_rect = msg_surf.get_rect(centerx=panel_rect.centerx, y=panel_rect.top + 95)
-        # 背景
-        bg = msg_rect.inflate(16, 8)
-        pygame.draw.rect(surface, (0, 0, 0, 140), bg, border_radius=8)
-        pygame.draw.rect(surface, (255, 215, 0), bg, width=2, border_radius=8)
-        surface.blit(msg_surf, msg_rect)
-
-    def _draw_particles(self, surface):
-        for p in self.coin_particles:
-            # life-based alpha
-            alpha = max(0, min(255, int(255 * (p['life'] / p['max_life']))))
-            coin = pygame.Surface((int(p['size']*2), int(p['size']*2)), pygame.SRCALPHA)
-            pygame.draw.circle(coin, (255, 215, 0, alpha), (int(p['size']), int(p['size'])), int(p['size']))
-            surface.blit(coin, (p['x']-p['size'], p['y']-p['size']))
+        desc

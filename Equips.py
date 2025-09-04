@@ -236,7 +236,6 @@ class VampiresFang(Equipment):
         self.rarity, self.type = "rare", "misc"
         self.lifesteal_ratio = 0.10
 
-    # after_attack 现在接收的是最终伤害数值
     def after_attack(self, wearer, target, actual_dmg):
         ratio = self.lifesteal_ratio
         if wearer.hp / wearer.max_hp < 0.5:
@@ -244,7 +243,8 @@ class VampiresFang(Equipment):
         
         healed_amount = actual_dmg * ratio
         if healed_amount > 0:
-            wearer.heal(healed_amount)
+            # ### 核心修复：将被攻击的 target 作为 combat_target 传入 ###
+            wearer.heal(healed_amount, combat_target=target)
 
 class HourglassOfTime(Equipment):
     """时光沙漏：副手槽；暴击时有40%几率立即重置攻击冷却。"""
@@ -421,6 +421,92 @@ class DragonscaleWard(Equipment):
             print(f"[龙鳞盾] 消耗了 {stacks} 层龙魂，获得了 {shield_gain} 点护盾！")
             wearer.shield += shield_gain
             wearer.remove_buff(soul_buff)
+
+# 文件: Equips.py (追加到文件末尾，但在UPGRADE_MAP之前)
+
+class Plaguebringer(Equipment):
+    """瘟疫使者: 武器; 攻击时引爆目标身上的所有【毒】层数，每层造成1点额外毒性伤害。"""
+    slot, display_name = "weapon", "瘟疫使者"
+    def __init__(self):
+        self.rarity, self.type = "rare", "weapon"
+        self.atk_bonus = 8
+
+    def after_attack(self, wearer, target, actual_dmg):
+        poison_debuff = next((b for b in target.buffs if isinstance(b, Buffs.PoisonDebuff)), None)
+        if poison_debuff:
+            stacks = poison_debuff.stacks
+            print(f"[瘟疫使者] 引爆了 {stacks} 层毒！")
+            # 造成额外伤害
+            packet = DamagePacket(amount=stacks, damage_type=DamageType.POISON, source=wearer)
+            target.take_damage(packet)
+            # 移除毒
+            target.remove_buff(poison_debuff)
+
+class ArmorSunderer(Equipment):
+    """碎甲战斧: 武器; 攻击时为目标叠加1层【破甲】。当目标防御为0时，你的攻击造成双倍伤害。"""
+    slot, display_name = "weapon", "碎甲战斧"
+    def __init__(self):
+        self.rarity, self.type = "epic", "weapon"
+        self.atk_bonus = 15
+
+    def before_attack(self, wearer, target, packet: DamagePacket):
+        if target.defense <= 0:
+            packet.amount *= 2
+
+    def after_attack(self, wearer, target, actual_dmg):
+        target.add_debuff(Buffs.SunderDebuff(stacks=1), source=wearer)
+
+class Windshear(Equipment):
+    """风切: 武器; 攻击有50%概率分裂成两次50%伤害的攻击，分裂的攻击有减半的概率继续分裂。"""
+    slot, display_name = "weapon", "风切"
+    def __init__(self):
+        self.rarity, self.type = "legendary", "weapon"
+        self.atk_bonus = 10
+
+    def after_attack(self, wearer, target, actual_dmg):
+        split_chance = 0.5
+        while random.random() < split_chance:
+            print("[风切] 攻击分裂！")
+            # 造成一次50%伤害的额外攻击
+            packet = DamagePacket(amount=wearer.attack * 0.5, damage_type=DamageType.PHYSICAL, source=wearer)
+            target.take_damage(packet)
+            split_chance /= 2 # 概率减半
+
+class RingOfFlourishing(Equipment):
+    """繁盛指环: 饰品; 当你获得任意Buff时，有30%概率额外获得一层【生机绽放】。"""
+    slot, display_name = "accessory", "繁盛指环"
+    def __init__(self):
+        self.rarity, self.type = "rare", "misc"
+
+    def on_buff_applied(self, wearer, buff_applied):
+        """这是一个新的自定义钩子，会在Character.add_status中被调用"""
+        
+        if not buff_applied.is_debuff and not isinstance(buff_applied, Buffs.VitalityBloomBuff) and random.random() < 0.3:
+            print("[繁盛指环] 效果触发！")
+            wearer.add_buff(Buffs.VitalityBloomBuff(stacks=1))
+
+
+class RuneBlade(Equipment):
+    """符文之刃 [武器-稀有]
+    +12 攻击力。
+    你的所有普通攻击都会造成魔法伤害，伤害值取决于你的攻击力。
+    """
+    slot = "weapon"
+    display_name = "符文之刃"
+
+    def __init__(self):
+        self.rarity = "rare"  # 稀有品质
+        self.type = "weapon"
+        self.atk_bonus = 12
+
+    def before_attack(self, wearer, target, packet: DamagePacket):
+        """
+        在攻击伤害包（packet）被最终计算前进行修改。
+        这个钩子函数在 Character.try_attack 中被调用。
+        """
+        # ### 核心效果：将伤害类型从默认的物理伤害改为魔法伤害 ###
+        packet.damage_type = DamageType.MAGIC
+
 
 UPGRADE_MAP = {
     WoodenSword: WoodenSword_Star,

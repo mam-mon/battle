@@ -1,35 +1,37 @@
-# states/story.py (已更新)
+# 文件: states/story.py (完整替换)
+
 import pygame
 from .base import BaseState
 from .dungeon_screen import DungeonScreen
 from .saving import SaveScreen
 from .loading import LoadScreen
-# <-- 导入 Button 类
+from .backpack import BackpackScreen
+from .talents_screen import TalentsScreen
 from ui import draw_text, Button
 from settings import *
 
 class StoryScreen(BaseState):
     def __init__(self, game):
         super().__init__(game)
-        # <-- 重新布局，为“背包”按钮腾出空间
+        
+        # --- 核心修改 1: 重新布局，为“天赋”按钮腾出空间 ---
         button_w, button_h = 120, 40
         padding = 15
-        # 从右往左依次是 保存 -> 加载 -> 背包
+        # 从右往左依次是 保存 -> 加载 -> 背包 -> 天赋
         save_rect = pygame.Rect(SCREEN_WIDTH - padding - button_w, SCREEN_HEIGHT - padding - button_h - 250, button_w, button_h)
         load_rect = pygame.Rect(save_rect.left - padding - button_w, save_rect.top, button_w, button_h)
-        # <-- 新增背包按钮的位置
         backpack_rect = pygame.Rect(load_rect.left - padding - button_w, load_rect.top, button_w, button_h)
+        talents_rect = pygame.Rect(backpack_rect.left - padding - button_w, backpack_rect.top, button_w, button_h)
         
         self.buttons = {
             "save": Button(save_rect, "保存(S)", self.game.fonts['small']),
             "load": Button(load_rect, "加载(L)", self.game.fonts['small']),
-            # <-- 将新按钮添加到字典中
-            "backpack": Button(backpack_rect, "背包(B)", self.game.fonts['small'])
+            "backpack": Button(backpack_rect, "背包(B)", self.game.fonts['small']),
+            "talents": Button(talents_rect, "天赋(T)", self.game.fonts['small']) # <-- 新增天赋按钮
         }
         self._initialize_story()
 
     def _initialize_story(self):
-        # ... (此方法保持不变)
         start_index = getattr(self.game, "loaded_dialogue_index", 0)
         self.dialogue_index = start_index
         self.displayed_chars = 0
@@ -39,7 +41,6 @@ class StoryScreen(BaseState):
         self.game.loaded_dialogue_index = 0
 
     def update(self):
-        # ... (此方法保持不变)
         if not self.typing_complete:
             now = pygame.time.get_ticks()
             if now - self.last_char_time > self.typewriter_speed:
@@ -56,22 +57,22 @@ class StoryScreen(BaseState):
                     self.typing_complete = True
     
     def handle_event(self, event):
-        from states.backpack import BackpackScreen # <-- 确保导入
-        
-        # <-- 现在可以直接调用按钮的 handle_event 方法
+        # --- 核心修改 2: 增加对新按钮和快捷键的处理 ---
         if self.buttons['save'].handle_event(event):
             self.game.state_stack.append(SaveScreen(self.game))
             return
         if self.buttons['load'].handle_event(event):
             self.game.state_stack.append(LoadScreen(self.game))
             return
-        # <-- 新增：处理背包按钮点击事件
         if self.buttons['backpack'].handle_event(event):
             self.game.state_stack.append(BackpackScreen(self.game))
             return
+        # <-- 新增：处理天赋按钮点击事件
+        if self.buttons['talents'].handle_event(event):
+            self.game.state_stack.append(TalentsScreen(self.game))
+            return
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # 避免点击按钮时也触发对话前进
             is_over_button = any(btn.rect.collidepoint(event.pos) for btn in self.buttons.values())
             if not is_over_button:
                 self._advance_dialogue()
@@ -85,51 +86,39 @@ class StoryScreen(BaseState):
                 self.game.state_stack.append(LoadScreen(self.game))
             elif event.key == pygame.K_b:
                 self.game.state_stack.append(BackpackScreen(self.game))
-    
-# 在 states/story.py 文件中，找到并替换这个函数
+            # <-- 新增：处理天赋快捷键 'T'
+            elif event.key == pygame.K_t:
+                self.game.state_stack.append(TalentsScreen(self.game))
 
     def _advance_dialogue(self):
-        from states.combat import CombatScreen
-        from states.title import TitleScreen
-        from states.dungeon_screen import DungeonScreen
+        from .combat import CombatScreen
+        from .title import TitleScreen
 
         stage_data = self.game.story_data.get(self.game.current_stage)
         if not stage_data:
-            print(f"错误: 找不到剧情ID: {self.game.current_stage}")
             self.game.state_stack = [TitleScreen(self.game)]
             return
             
         dialogue_list = stage_data.get("text", [])
 
-        # 如果打字机效果还没结束，就立刻完成它
         if not self.typing_complete:
             self.typing_complete = True
-            # 安全检查，防止空对话列表
             if self.dialogue_index < len(dialogue_list):
                 current_line = dialogue_list[self.dialogue_index].get("line", "")
                 self.displayed_chars = len(current_line)
             return
 
-        # --- 核心修复：先检查是否应该推进，再处理 ---
-        # 检查当前对话行是否有action
         if self.dialogue_index < len(dialogue_list):
             current_dialogue = dialogue_list[self.dialogue_index]
-            # 文件: states/story.py (_advance_dialogue 方法内)
             action = current_dialogue.get("action")
             if action == "start_trial":
                 self.game.state_stack.pop()
-                # --- 核心修改在这里 ---
-                # 旧代码: self.game.state_stack.append(DungeonScreen(self.game))
-                # 新代码：明确告诉DungeonScreen要加载哪个地牢的第1层
                 self.game.state_stack.append(DungeonScreen(self.game, "sunstone_ruins", 1))
                 return
 
-        # 推进到下一句对话
         self.dialogue_index += 1
 
-        # --- 在这里检查是否结束 ---
         if self.dialogue_index >= len(dialogue_list):
-            # 所有对话都结束了，进入下一个stage
             self.game.current_stage = stage_data.get("next", "quit")
             if self.game.current_stage == "quit":
                 self.game.state_stack = [TitleScreen(self.game)]
@@ -141,9 +130,8 @@ class StoryScreen(BaseState):
                 self.game.state_stack.pop()
                 self.game.state_stack.append(CombatScreen(self.game, enemy_id))
             else:
-                self._initialize_story() # 重置对话状态以准备下一个story stage
+                self._initialize_story()
         else:
-            # 如果还有下一句，则重置打字机
             self.displayed_chars = 0
             self.typing_complete = False
             self.last_char_time = 0
@@ -154,7 +142,6 @@ class StoryScreen(BaseState):
         pygame.draw.rect(surface, PANEL_BG_COLOR, dialogue_box_rect, border_radius=10)
         pygame.draw.rect(surface, PANEL_BORDER_COLOR, dialogue_box_rect, 3, border_radius=10)
 
-        # ... (对话框和文本绘制逻辑保持不变) ...
         stage_data = self.game.story_data.get(self.game.current_stage, {})
         dialogue_list = stage_data.get("text", [{"speaker": "错误", "line": "未找到剧情文本"}])
         safe_index = min(self.dialogue_index, len(dialogue_list) - 1)
@@ -174,6 +161,6 @@ class StoryScreen(BaseState):
             prompt_pos = (dialogue_box_rect.right - 40, dialogue_box_rect.bottom - 40)
             pygame.draw.polygon(surface, TEXT_COLOR, [prompt_pos, (prompt_pos[0] - 20, prompt_pos[1]), (prompt_pos[0] - 10, prompt_pos[1] - 15)])
         
-        # <-- 绘制会自动包含新按钮，无需修改
+        # 绘制所有按钮 (会自动包含新按钮，无需修改)
         for button in self.buttons.values():
             button.draw(surface)

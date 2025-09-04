@@ -133,21 +133,23 @@ class Game:
             return True
         return False
    
+    # 文件: game.py (替换这个函数)
+
     def start_new_game(self):
-        player_eq = [Equips.WoodenSword(), Equips.WoodenArmor(), Equips.NaturalNecklace(), Equips.IronRing()]#
+        player_eq = [Equips.WoodenSword(), Equips.WoodenArmor(), Equips.NaturalNecklace(), Equips.IronRing()]
         player_talents = [
-            Talents.HeartOfHealingTalent(), # 治愈之心
-            Talents.DualWieldTalent(),       # 二刀流
+            Talents.HeartOfHealingTalent(),
+            Talents.DualWieldTalent(),
+            Talents.Adventurer()
         ]
+        
+        # --- 核心修改：使用从 settings.py 导入的 PLAYER_BASE_STATS ---
+        # **PLAYER_BASE_STATS 是一种简便写法，它会自动把字典里的所有键值对作为参数传入
         self.player = Character(
             "玩家", 
-            hp=300, 
-            defense=5, 
-            magic_resist=3, 
-            attack=20, 
-            attack_speed=1.2, 
+            **PLAYER_BASE_STATS, # <-- 使用我们定义的标准属性
             equipment=player_eq,
-            talents=player_talents  # <-- 将天赋列表传给角色
+            talents=player_talents
         )
         self.current_stage = "1"
         self.loaded_dialogue_index = 0

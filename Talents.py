@@ -18,6 +18,9 @@ import sys
 from rich.console import Console
 
 from damage import DamagePacket, DamageType
+from battle_logger import battle_logger
+from settings import TEXT_COLOR, DAMAGE_TYPE_COLORS
+from ui import format_damage_log
 
 class Talent:
     """天赋基类，之后可扩展更多钩子"""
@@ -64,18 +67,17 @@ class ThousandWorldTalent(Talent):
     def __init__(self, chance: float = 0.33):
         self.chance = chance
 
+    # 文件: Talents.py (在 ThousandWorldTalent 类中，替换 on_attack 方法)
+
     def on_attack(self, wearer, target, dmg):
         """
-        在主攻后调用，如果命中且触发了三千世界，
-        就返回额外攻击的文本列表；否则返回空列表。
+        额外攻击现在会自己处理日志，所以这里不再需要返回任何东西。
         """
-        extra_texts = []
         if random.random() < self.chance:
             # 额外出手两次
             for _ in range(2):
-                text = wearer.perform_extra_attack(target)
-                extra_texts.append(text)
-        return extra_texts
+                wearer.perform_extra_attack(target)
+        # 不再需要返回 extra_texts
 
 class HeartOfHealingTalent(Talent):
     """治愈之心：被施加可驱散的 Debuff 时，30% 概率驱散此层，并获得 1 层 再生"""
@@ -151,13 +153,17 @@ class Giant(Talent):
         wearer.attack_speed *= 0.8
         wearer.attack_interval = 6.0 / wearer.attack_speed
 
+
 class Executioner(Talent):
-    """【天赋】处决者：对生命值低于30%的敌人造成100%额外伤害。"""
+    """【天赋】处决者：立即斩杀生命值低于20%的敌人。"""
     display_name = "处决者"
+    
     def on_attack(self, wearer, target, dmg):
-        if target.hp / target.max_hp < 0.3:
-            # 造成一次额外的真实伤害
-            packet = DamagePacket(amount=dmg * 1.0, damage_type=DamageType.TRUE, source=wearer)
+        # 这个效果在造成伤害后触发
+        if target.hp > 0 and (target.hp / target.max_hp < 0.2):
+            print(f"[处决者] 斩杀了 {target.name}！")
+            kill_damage = target.hp
+            packet = DamagePacket(amount=kill_damage, damage_type=DamageType.TRUE, source=wearer)
             target.take_damage(packet)
 
 class Scavenger(Talent):
@@ -193,8 +199,6 @@ class AdrenalineRush(Talent):
     display_name = "肾上腺素"
     # (此天赋逻辑复杂，需要战斗系统支持 on_kill 钩子)
 
-# 文件: Talents.py
-
 class Brawler(Talent):
     """【天赋】格斗家：你无法装备副手物品，但你的基础攻击力提升30%。"""
     display_name = "格斗家"
@@ -206,7 +210,44 @@ class Brawler(Talent):
         # wearer.attack = wearer.base_attack
         # wearer.recalculate_stats()
 
-class QuickLearner(Talent):
-    """【天赋】速学者：获得的经验值提升25%。"""
-    display_name = "速学者"
+class Adventurer(Talent):
+    """【天赋】冒险者：获得的经验值提升50%。"""
+    display_name = "冒险者"
     # (此天赋的逻辑需要在 add_exp 中检查)
+
+class SacredRetribution(Talent):
+    """【神圣报偿】: 每当你恢复生命时，对敌人造成等同于50%恢复量的真实伤害。"""
+    display_name = "神圣报偿"
+
+    def on_healed(self, wearer, healed_amount, combat_target):
+        if combat_target and combat_target.hp > 0 and healed_amount > 0:
+            damage = healed_amount * 0.5
+            
+            from damage import DamagePacket, DamageType
+            packet = DamagePacket(amount=damage, damage_type=DamageType.TRUE, source=wearer)
+            
+            # ### 核心修改：先获取伤害报告，再用工具格式化日志 ###
+            damage_details = combat_target.take_damage(packet)
+            log_parts = format_damage_log(damage_details, action_name="神圣报偿")
+            battle_logger.log(log_parts)
+
+            # 不再需要返回任何东西
+
+
+class Overwhelm(Talent):
+    """【破势】: 对生命值高于50%的敌人，你的攻击造成200%伤害。"""
+    display_name = "破势"
+
+    def before_attack(self, wearer, target, packet: DamagePacket):
+        """这是一个新的自定义钩子，会在Character.try_attack中被调用"""
+        if target.hp / target.max_hp > 0.5:
+            packet.amount *= 2
+
+class SunfireAura(Talent):
+    """【日炎光环】: 战斗开始时，对敌人施加【日炎灼烧】效果。"""
+    display_name = "日炎光环"
+
+    def on_battle_start(self, wearer, enemy):
+        """这是一个新的自定义钩子，会在CombatScreen中被调用"""
+        print(f"[{wearer.name}的日炎光环] 对 {enemy.name} 施加了灼烧！")
+        enemy.add_debuff(Buffs.SunfireAuraDebuff(source_char=wearer))

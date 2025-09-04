@@ -99,11 +99,11 @@
     "poisonDragon": {
         "name": "毒龙",
         "stats": {
-            "hp": 800,
-            "defense": 14,
-            "magic_resist": 2,
-            "attack": 8,
-            "attack_speed": 1.2
+            "hp": 1800,
+            "defense": 20,
+            "magic_resist": 3,
+            "attack": 18,
+            "attack_speed": 1.5
         },
         "talents": [
             "PoisonousTalent",

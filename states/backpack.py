@@ -1,10 +1,13 @@
-# states/backpack.py (Complete File)
+# 文件: states/backpack.py (完整替换)
+
+# ... (所有 import 语句保持不变) ...
 import pygame
 import math
 from .base import BaseState
 from ui import draw_text, draw_panel, get_display_name, TooltipManager, Button
 from settings import *
 
+# ... (SLOT_CONFIG 和 RARITY_COLORS 保持不变) ...
 SLOT_CONFIG = {
     "weapon": {"name": "武器", "icon": "武", "color": (255, 100, 100)},
     "offhand": {"name": "副手", "icon": "副", "color": (100, 255, 100)},
@@ -13,16 +16,19 @@ SLOT_CONFIG = {
     "pants": {"name": "腿甲", "icon": "腿", "color": (255, 100, 255)},
     "accessory": {"name": "饰品", "icon": "饰", "color": (100, 255, 255)},
 }
-
 RARITY_COLORS = {
     "common": (156, 163, 175), "uncommon": (16, 185, 129), "rare": (59, 130, 246),
     "epic": (139, 92, 246), "legendary": (245, 158, 11),
 }
 
 class BackpackScreen(BaseState):
-    def __init__(self, game):
+    def __init__(self, game, player_override=None): # <-- 核心修改1
         super().__init__(game)
+        self.player = player_override or self.game.player # <-- 核心修改2
+
+        # --- 后续所有用到 self.game.player 的地方，都改成 self.player ---
         self.is_overlay = True
+        # ... (其他初始化代码不变) ...
         self.dragging_item, self.dragging_from, self.dragging_from_info = None, None, {}
         self.selected_category, self.search_text, self.search_active = "all", "", False
         self.hover_slot = None
@@ -30,6 +36,7 @@ class BackpackScreen(BaseState):
         self._setup_layout()
         self._setup_animations()
 
+    # ... (除了下面被替换的方法，其他所有方法都不变) ...
     def _get_font(self, font_name, default_size=20):
         try:
             if hasattr(self.game, 'fonts') and font_name in self.game.fonts: return self.game.fonts[font_name]
@@ -69,7 +76,7 @@ class BackpackScreen(BaseState):
 
     def _generate_equipment_slots(self):
         self.equipment_slots = {}
-        player = self.game.player
+        player = self.player # <-- 修改点
         model_rect = pygame.Rect(self.character_panel_rect.x + 15, self.character_panel_rect.y + 15, self.character_panel_rect.width - 30, 300)
         slot_size, spacing = 50, 10
         center_x = model_rect.centerx
@@ -116,73 +123,52 @@ class BackpackScreen(BaseState):
         elif event.type == pygame.MOUSEMOTION: self._handle_mouse_motion(event.pos)
 
     def _handle_mouse_down(self, pos):
+        player = self.player # <-- 修改点
         if self.search_rect.collidepoint(pos): self.search_active = True; return
         else: self.search_active = False
-
         for button in self.category_buttons:
             if button["rect"].collidepoint(pos): self.selected_category = button["id"]; return
-
         if self.dragging_item: return
-
-        # 从装备槽拾起
         for slot_type, slot_rects in self.equipment_slots.items():
             for i, rect in enumerate(slot_rects):
-                if rect.collidepoint(pos) and self.game.player.slots[slot_type][i] is not None:
-                    item_to_drag = self.game.player.slots[slot_type][i]
-                    self.dragging_item = self.game.player.unequip(item_to_drag) # 使用新的unequip
+                if rect.collidepoint(pos) and player.slots[slot_type][i] is not None:
+                    item_to_drag = player.slots[slot_type][i]
+                    self.dragging_item = player.unequip(item_to_drag)
                     self.dragging_from = 'equipment'
                     self.dragging_from_info = {'slot_type': slot_type, 'index': i}
                     return
-
-        # 从背包拾起
         filtered_items = self._get_filtered_items()
         for i, rect in enumerate(self.backpack_slots):
             if rect.collidepoint(pos) and i < len(filtered_items):
                 original_item = filtered_items[i]
-                original_index_in_backpack = self.game.player.backpack.index(original_item)
-                self.dragging_item = self.game.player.backpack.pop(original_index_in_backpack)
+                original_index_in_backpack = player.backpack.index(original_item)
+                self.dragging_item = player.backpack.pop(original_index_in_backpack)
                 self.dragging_from = 'backpack'
                 self.dragging_from_info = {'index': original_index_in_backpack}
                 return
 
-    # --- 2. 替换 _handle_mouse_up 方法 ---
     def _handle_mouse_up(self, pos):
         if not self.dragging_item: return
-
-        player = self.game.player
-        source_type = self.dragging_from
-        source_info = self.dragging_from_info
-
-        # 检查是否放置在装备槽上
+        player = self.player # <-- 修改点
+        source_type, source_info = self.dragging_from, self.dragging_from_info
         for slot_type, slot_rects in self.equipment_slots.items():
             for i, rect in enumerate(slot_rects):
                 if rect.collidepoint(pos) and self.dragging_item.slot == slot_type:
-                    # 使用新的equip方法，并传入精确的索引 i
                     replaced_item = player.equip(self.dragging_item, specific_index=i)
-
-                    # 如果有物品被替换下来，处理它
                     if replaced_item:
-                        # 如果拖拽的物品来自背包，则把替换下的物品放回背包
                         if source_type == 'backpack':
                             player.backpack.append(replaced_item)
-                        # 如果拖拽的物品来自另一个装备槽（实现交换）
                         elif source_type == 'equipment':
-                            # 尝试把被替换的物品，装备回原来的拖拽起始槽
                             player.equip(replaced_item, specific_index=source_info['index'])
-
                     self.dragging_item = None
                     return
-
-        # 检查是否放置在背包网格上
         if self.grid_rect.collidepoint(pos):
             player.backpack.append(self.dragging_item)
             self.dragging_item = None
             return
-
-        # 如果放置在无效区域，返回原处
         self._return_dragging_item()
         self.dragging_item = None
-        
+
     def _handle_mouse_motion(self, pos):
         for button in self.category_buttons: button["hover"] = button["rect"].collidepoint(pos)
         self.hover_slot = None
@@ -191,7 +177,7 @@ class BackpackScreen(BaseState):
                 if rect.collidepoint(pos): self.hover_slot = (slot_type, i); break
 
     def _get_filtered_items(self):
-        items = self.game.player.backpack.copy()
+        items = self.player.backpack.copy() # <-- 修改点
         if self.selected_category != "all":
             items = [item for item in items if hasattr(item, 'type') and item.type == self.selected_category]
         if self.search_text:
@@ -200,20 +186,22 @@ class BackpackScreen(BaseState):
 
     def _return_dragging_item(self):
         if not self.dragging_item: return
+        player = self.player # <-- 修改点
         if self.dragging_from == 'backpack': 
-            self.game.player.backpack.insert(self.dragging_from_info.get('index', 0), self.dragging_item)
+            player.backpack.insert(self.dragging_from_info.get('index', 0), self.dragging_item)
         elif self.dragging_from == 'equipment': 
-            self.game.player.equip(self.dragging_item)
+            player.equip(self.dragging_item)
 
     def _update_hovers(self):
         if self.dragging_item: self.tooltip_manager.update(None); return
         mouse_pos = pygame.mouse.get_pos()
+        player = self.player # <-- 修改点
         hovered_item = None
         all_elements = []
         for slot_type, slot_rects in self.equipment_slots.items():
-            equipped_items = self.game.player.slots.get(slot_type, [])
+            equipped_items = player.slots.get(slot_type, [])
             for i, rect in enumerate(slot_rects):
-                if i < len(equipped_items): all_elements.append((rect, equipped_items[i]))
+                if equipped_items[i] is not None: all_elements.append((rect, equipped_items[i]))
         filtered_items = self._get_filtered_items()
         for i, rect in enumerate(self.backpack_slots):
             if i < len(filtered_items): all_elements.append((rect, filtered_items[i]))
@@ -292,23 +280,16 @@ class BackpackScreen(BaseState):
         self._draw_equipment_slots(surface); self._draw_character_stats(surface, panel_bg)
 
     def _draw_equipment_slots(self, surface):
-        player = self.game.player # 先获取玩家对象
+        player = self.player # <-- 修改点
         for slot_type, slot_rects in self.equipment_slots.items():
             slot_config = SLOT_CONFIG.get(slot_type, {"name": slot_type, "icon": "?", "color": (100, 100, 100)})
             for i, slot_rect in enumerate(slot_rects):
                 is_hover = self.hover_slot == (slot_type, i)
                 bg_color, border_color = ((*slot_config["color"], 50), slot_config["color"]) if is_hover else ((40, 50, 70, 100), (70, 80, 100))
-                
                 pygame.draw.rect(surface, bg_color, slot_rect, border_radius=8)
                 pygame.draw.rect(surface, border_color, slot_rect, width=2, border_radius=8)
-                
-                # --- 核心修复在这里 ---
-                # 直接从 player.slots 获取指定位置的物品，它可能是真实装备，也可能是 None
                 item_in_slot = player.slots[slot_type][i]
-
-                # 判断槽位里是否有物品
                 if item_in_slot is not None:
-                    # 如果有物品，并且不是正在拖拽的那个，就绘制物品名称
                     if item_in_slot != self.dragging_item:
                         item_name = get_display_name(item_in_slot)
                         font = self._get_font('small', 13)
@@ -318,16 +299,15 @@ class BackpackScreen(BaseState):
                         text_rect = text.get_rect(center=slot_rect.center)
                         surface.blit(text, text_rect)
                 else:
-                    # 如果没有物品 (值为None)，就绘制插槽的默认名称
                     font = self._get_font('small', 14)
                     text_surf = font.render(slot_config["name"], True, (80, 90, 110))
                     text_rect = text_surf.get_rect(center=slot_rect.center)
                     surface.blit(text_surf, text_rect)
-                    
+
     def _draw_character_stats(self, surface, panel_bg):
         stats_area = pygame.Rect(panel_bg.x + 15, panel_bg.bottom - 185, panel_bg.width - 30, 170)
         pygame.draw.rect(surface, (20, 25, 40, 150), stats_area, border_radius=10)
-        player = self.game.player
+        player = self.player # <-- 修改点
         stats_data = [("最大生命", f"{int(getattr(player, 'max_hp', 0))}"), ("攻击", f"{int(getattr(player, 'attack', 0))}"), ("防御", f"{int(getattr(player, 'defense', 0))}"), ("攻击速度", f"{getattr(player, 'attack_speed', 0):.2f}"), ("暴击率", f"{getattr(player, 'crit_chance', 0) * 100:.1f}%"), ("暴击伤害", f"{getattr(player, 'crit_multiplier', 0) * 100:.1f}%")]
         stats_font = self.game.fonts['small']; line_height = 26; y_offset = stats_area.y + 12
         for i, (name, value) in enumerate(stats_data):
