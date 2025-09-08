@@ -26,7 +26,7 @@ BUFF_ICON_SIZE = (32, 32)
 
 # --- 布局位置 ---
 # (这些是建议值，你可以随时调整)
-PLAYER_PANEL_RECT = pygame.Rect(50, 450, 500, 250)
+PLAYER_PANEL_RECT = pygame.Rect(50, 50, 500, 250)
 ENEMY_PANEL_RECT = pygame.Rect(SCREEN_WIDTH - 550, 50, 500, 250)
 BATTLE_LOG_RECT = pygame.Rect(50, 50, SCREEN_WIDTH - 650, 350)
 PLAYER_ACTION_PANEL_RECT = pygame.Rect(PLAYER_PANEL_RECT.right + 20, PLAYER_PANEL_RECT.top, 200, PLAYER_PANEL_RECT.height)

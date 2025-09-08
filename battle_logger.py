@@ -14,14 +14,16 @@ class BattleLogger:
         print("[BattleLogger] 日志显示器已注销。")
         self._renderer = None
 
-    def log(self, parts, color=None):
+    # battle_logger.py (修改后)
+
+    def log(self, parts): # <--- 改动 1：移除 color 参数
         """
         全局日志接口。
         任何地方都可以调用这个函数来发送日志。
         """
         if self._renderer:
             # 直接调用显示器的 add_message 方法
-            self._renderer.add_message(parts, color=color)
+            self._renderer.add_message(parts) # <--- 改动 2：移除 color 参数
         else:
             # 如果没有注册显示器（比如非战斗状态），则在控制台打印
             if isinstance(parts, list):

@@ -20,6 +20,7 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
         self.fonts = ui.init_fonts()
+        ui.prepare_fallback_fonts(self.fonts['small']) 
         self.state_stack = []
 
         # <-- 核心改动：在游戏启动时加载所有Buff图标资源 -->

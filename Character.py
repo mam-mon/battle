@@ -391,8 +391,8 @@ class Character:
 
         log_parts = format_damage_log(damage_details, action_name="普攻")
 
-        # 4. 返回这个富文本列表和额外信息
-        return (log_parts, extra_texts)
+        # Character.py -> try_attack (修改后)
+        return (log_parts, extra_texts, damage_details)
 
 
     def perform_extra_attack(self, target):

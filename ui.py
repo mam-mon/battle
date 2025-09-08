@@ -298,3 +298,158 @@ def format_damage_log(damage_details, action_name="效果"):
         log_parts.append((" (暴击!)", CRIT_COLOR))
         
     return log_parts
+
+def draw_text(surface, text, font, color, rect, aa=True, return_cursor_pos=False):
+    """
+    绘制自动换行的文本，并可选择性地返回最后一个字符后的光标位置。
+    """
+    y = rect.top
+    line_spacing = -2
+    font_height = font.size("Tg")[1]
+
+    # --- 核心修改：计算光标位置所需变量 ---
+    cursor_pos = (rect.left, y)
+
+    # 自动换行
+    words = text.split(' ')
+    lines = []
+    current_line = ""
+    for word in words:
+        # 处理包含手动换行符的单词
+        if '\n' in word:
+            parts = word.split('\n')
+            for i, part in enumerate(parts):
+                test_line = current_line + (" " if current_line else "") + part
+                if font.size(test_line)[0] > rect.width and current_line:
+                    lines.append(current_line)
+                    current_line = part
+                else:
+                    current_line = test_line
+                
+                if i < len(parts) - 1: # 如果不是最后一个部分，说明是手动换行
+                    lines.append(current_line)
+                    current_line = ""
+            continue # 继续下一个单词
+
+        # 正常单词处理
+        test_line = current_line + (" " if current_line else "") + word
+        if font.size(test_line)[0] > rect.width and current_line:
+            lines.append(current_line)
+            current_line = word
+        else:
+            current_line = test_line
+            
+    lines.append(current_line)
+
+    # 逐行绘制
+    for i, line in enumerate(lines):
+        line_surface = font.render(line, aa, color)
+        surface.blit(line_surface, (rect.left, y))
+        
+        # --- 核心修改：更新光标位置 ---
+        if i == len(lines) - 1: # 如果是最后一行
+            cursor_pos = (rect.left + line_surface.get_width(), y)
+
+        y += font_height + line_spacing
+
+    if return_cursor_pos:
+        return cursor_pos
+    return None
+
+def draw_text_with_outline(surface, text, font, text_color, outline_color, pos, outline_width=2):
+    """
+    在指定位置绘制带有描边的文字。
+    
+    :param surface: 目标 Surface
+    :param text: 要绘制的字符串
+    :param font: 使用的 Pygame 字体对象
+    :param text_color: 文字本身的颜色
+    :param outline_color: 描边的颜色
+    :param pos: 文字中心点的 (x, y) 坐标
+    :param outline_width: 描边的像素宽度
+    """
+    # 1. 渲染底层的描边文字
+    text_surface_outline = font.render(text, True, outline_color)
+    
+    # 2. 在8个方向上绘制描边
+    #    这会形成一个坚实、平滑的轮廓
+    for dx in range(-outline_width, outline_width + 1):
+        for dy in range(-outline_width, outline_width + 1):
+            if dx == 0 and dy == 0:
+                continue # 跳过中心点
+            outline_rect = text_surface_outline.get_rect(center=(pos[0] + dx, pos[1] + dy))
+            surface.blit(text_surface_outline, outline_rect)
+            
+    # 3. 渲染顶层的原始文字
+    text_surface_main = font.render(text, True, text_color)
+    main_rect = text_surface_main.get_rect(center=pos)
+    
+    # 4. 在正中央绘制原始文字，覆盖在描边之上
+    surface.blit(text_surface_main, main_rect)
+
+# ui.py (在文件末尾追加)
+import emoji
+
+# --- 新增：在这里提前创建好两种字体对象 ---
+# 确保在调用 init_fonts() 之后执行
+EMOJI_FONT = None
+DEFAULT_FONT_FOR_FALLBACK = None
+
+def prepare_fallback_fonts(default_font):
+    """
+    在游戏初始化后调用，准备用于回退的字体。
+    """
+    global EMOJI_FONT, DEFAULT_FONT_FOR_FALLBACK
+    DEFAULT_FONT_FOR_FALLBACK = default_font
+    try:
+        # 尝试加载系统中的 Emoji 字体，大小和默认字体匹配
+        EMOJI_FONT = pygame.font.SysFont('Segoe UI Emoji', default_font.get_height())
+    except pygame.error:
+        print("警告: 未找到 'Segoe UI Emoji' 字体，Emoji 可能无法正常显示。")
+        EMOJI_FONT = default_font # 如果找不到，就用回默认字体，避免崩溃
+
+def draw_text_with_emoji_fallback(surface, text, pos, color):
+    """
+    使用字体回退机制，绘制同时包含普通文本和 Emoji 的字符串。
+    """
+    if not DEFAULT_FONT_FOR_FALLBACK or not EMOJI_FONT:
+        # 如果字体没准备好，就用最简单的方式绘制，防止出错
+        fallback_surf = pygame.font.Font(None, 20).render(text, True, color)
+        surface.blit(fallback_surf, pos)
+        return
+
+    x_offset = pos[0]
+    y_offset = pos[1]
+    
+    current_text_segment = ""
+    current_font_is_emoji = False
+
+    # 逐个字符检查
+    for char in text:
+        is_emoji = char in emoji.EMOJI_DATA
+        
+        # 如果是第一个字符，初始化状态
+        if not current_text_segment:
+            current_text_segment += char
+            current_font_is_emoji = is_emoji
+            continue
+
+        # 如果字符类型没变，就继续添加到当前段落
+        if is_emoji == current_font_is_emoji:
+            current_text_segment += char
+        else:
+            # 字符类型变化了！渲染并清空上一段
+            font_to_use = EMOJI_FONT if current_font_is_emoji else DEFAULT_FONT_FOR_FALLBACK
+            rendered_segment = font_to_use.render(current_text_segment, True, color)
+            surface.blit(rendered_segment, (x_offset, y_offset))
+            x_offset += rendered_segment.get_width()
+            
+            # 开始新的一段
+            current_text_segment = char
+            current_font_is_emoji = is_emoji
+
+    # 渲染最后剩下的一段
+    if current_text_segment:
+        font_to_use = EMOJI_FONT if current_font_is_emoji else DEFAULT_FONT_FOR_FALLBACK
+        rendered_segment = font_to_use.render(current_text_segment, True, color)
+        surface.blit(rendered_segment, (x_offset, y_offset))
