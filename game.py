@@ -137,11 +137,11 @@ class Game:
     # 文件: game.py (替换这个函数)
 
     def start_new_game(self):
-        player_eq = [Equips.WoodenSword(), Equips.WoodenArmor(), Equips.NaturalNecklace(), Equips.IronRing()]
+        player_eq = [Equips.WoodenSword(), Equips.DragonHeart()]
         player_talents = [
-            Talents.HeartOfHealingTalent(),
-            Talents.DualWieldTalent(),
-            Talents.Adventurer()
+            #Talents.HeartOfHealingTalent(),
+            #Talents.DualWieldTalent(),
+            #Talents.Adventurer()
         ]
         
         # --- 核心修改：使用从 settings.py 导入的 PLAYER_BASE_STATS ---

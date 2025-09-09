@@ -274,8 +274,6 @@ class CombatVictoryScreen(BaseState):
                 sparkle['life'] = sparkle['max_life']
                 sparkle['alpha'] = random.uniform(100, 255)
 
-# states/combat_victory.py (替换从 draw() 到文件末尾的所有代码)
-
     def draw(self, surface):
         """绘制所有界面元素"""
         self._draw_victory_background(surface)
@@ -345,30 +343,36 @@ class CombatVictoryScreen(BaseState):
         
         # 经验条动画
         start_w = bar_rect.width * self.exp_start_percent
-        target_w = bar_rect.width * (self.game.player.exp / self.game.player.exp_to_next_level)
+        target_w = bar_rect.width * (self.game.player.exp / self.game.player.exp_to_next_level) if self.game.player.exp_to_next_level > 0 else 0
         
-        # 如果升级了，目标宽度应该是100%，然后从0开始
         if self.level_up_events:
             final_w_before_levelup = bar_rect.width
-            # 动画分为两部分：填满旧等级 -> 填充新等级
-            anim_split_point = (final_w_before_levelup - start_w) / ((final_w_before_levelup - start_w) + target_w) if ((final_w_before_levelup - start_w) + target_w) > 0 else 1
+            total_anim_width = (final_w_before_levelup - start_w) + target_w
+            anim_split_point = (final_w_before_levelup - start_w) / total_anim_width if total_anim_width > 0 else 1.0
             
             if self.exp_animation_progress < anim_split_point:
-                progress = self.exp_animation_progress / anim_split_point
+                progress = self.exp_animation_progress / anim_split_point if anim_split_point > 0 else 1.0
                 current_w = start_w + (final_w_before_levelup - start_w) * progress
             else:
-                progress = (self.exp_animation_progress - anim_split_point) / (1 - anim_split_point)
+                ### --- 关键修复：在这里添加一个安全检查 --- ###
+                denominator = 1 - anim_split_point
+                if denominator <= 0:
+                    progress = 1.0 # 如果没有动画的第二部分，则直接视为完成
+                else:
+                    progress = (self.exp_animation_progress - anim_split_point) / denominator
+                ### --- 修复结束 --- ###
+
                 current_w = target_w * progress
-                # 升级后，更新显示的等级
                 level_text = f"等级 {self.game.player.level}"
                 level_surf = level_font.render(level_text, True, TEXT_COLOR)
                 surface.blit(level_surf, (bar_rect.x, bar_rect.y - 30))
-        else: # 未升级
+        else:
             current_w = start_w + (target_w - start_w) * self.exp_animation_progress
 
         # 绘制经验条前景
-        xp_fill_rect = pygame.Rect(bar_rect.x + 2, bar_rect.y + 2, current_w - 4, bar_rect.height - 4)
-        pygame.draw.rect(surface, XP_BAR_COLOR, xp_fill_rect, border_radius=6)
+        if current_w > 0:
+            xp_fill_rect = pygame.Rect(bar_rect.x + 2, bar_rect.y + 2, current_w - 4, bar_rect.height - 4)
+            pygame.draw.rect(surface, XP_BAR_COLOR, xp_fill_rect, border_radius=6)
         
         # 经验值文本
         exp_font = self._get_font('small', 16)

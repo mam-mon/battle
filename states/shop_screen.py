@@ -121,9 +121,11 @@ class ShopScreen(BaseState):
             self.origin_room.is_cleared = True
             from .dungeon_screen import DungeonScreen
             if len(self.game.state_stack) > 1 and isinstance(self.game.state_stack[-2], DungeonScreen):
-                self.game.state_stack[-2].door_rects = self.game.state_stack[-2]._generate_doors()
+                # --- 核心修复：不再调用不存在的函数 ---
+                self.game.state_stack[-2].is_returning = True
             self.game.state_stack.pop()
             return
+
         
         for i, (button, item, price, is_sold) in enumerate(self.shop_items):
             if not is_sold and button.handle_event(event):

@@ -1,265 +1,258 @@
+# states/dungeon_screen.py (完整替换)
+
 import pygame
+import math
 import random
+import inspect
 from .base import BaseState
-from dungeon_generator import Floor
+import dungeon_generator
 from player_sprite import Player
 from monster_sprite import Monster
 from treasure_sprite import TreasureChest
+from portal_sprite import PortalSprite
+from camera import Camera
 import Equips
 from settings import *
-from ui import Button
-from portal_sprite import PortalSprite # <-- 新增这一行
+from ui import ModernStoryButton, draw_text
+from door_sprite import Door
 
-NODE_STYLE = {"start": {"color": (100, 255, 100)},"combat": {"color": (200, 200, 200)}, "event": {"color": (255, 255, 100)},"treasure": {"color": (255, 215, 0)},"elite": {"color": (255, 50, 50)},"boss": {"color": (160, 32, 240)},"rest": {"color": (100, 200, 255)},"shop": {"color": (100, 255, 200)},"forge": {"color": (150, 150, 150)}}
-
-# File: states/dungeon_screen.py
+NODE_STYLE = {
+    "start": {"color": (100, 255, 100), "name": "起始"}, "combat": {"color": (200, 200, 200), "name": "战斗"}, 
+    "event": {"color": (255, 255, 100), "name": "事件"}, "treasure": {"color": (255, 215, 0), "name": "宝藏"},
+    "elite": {"color": (255, 50, 50), "name": "精英"}, "boss": {"color": (160, 32, 240), "name": "首领"},
+    "rest": {"color": (100, 200, 255), "name": "休息"}, "shop": {"color": (100, 255, 200), "name": "商店"},
+    "forge": {"color": (150, 150, 150), "name": "锻造"}
+}
 
 class DungeonScreen(BaseState):
     def __init__(self, game, dungeon_id="sunstone_ruins", floor_number=1):
         super().__init__(game)
-
         self.dungeon_id = dungeon_id
         self.floor_number = floor_number
-        self.dungeon_data = self.game.dungeon_data[dungeon_id]
-
-        self.current_floor_data = None
-        for pool in self.dungeon_data.get("floor_pools", []):
-            if self.floor_number in pool["floors"]:
-                self.current_floor_data = pool
-                break
-
-        self.floor = Floor()
-        self.floor.generate_floor(num_rooms=8, floor_data=self.current_floor_data)
-
-        self.player = Player(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
-        self.player_group = pygame.sprite.GroupSingle(self.player)
-        self.monster_group = pygame.sprite.Group()
-        self.chest_group = pygame.sprite.GroupSingle()
-        self.portal_group = pygame.sprite.GroupSingle() # <-- 新增传送门组
-
-        self.door_rects = {}
-        # self.exit_portal_button = None <-- 删除这一行
-
-        self.current_room = self.floor.start_room
-        self._enter_room(self.current_room)
-
-        backpack_button_rect = pygame.Rect(SCREEN_WIDTH - 160, 10, 140, 50)
-        self.backpack_button = Button(backpack_button_rect, "背包 (B)", self.game.fonts['small'])
-        talents_button_rect = pygame.Rect(backpack_button_rect.left - 150, 10, 140, 50)
-        self.talents_button = Button(talents_button_rect, "天赋 (T)", self.game.fonts['small'])
+        self.dungeon_data = self.game.dungeon_data.get(dungeon_id, {})
+        self.current_floor_data = next((pool for pool in self.dungeon_data.get("floor_pools", []) if floor_number in pool["floors"]), {})
         
-        # 文件: states/dungeon_screen.py (替换这个函数)
+        self.impassable_sprites = pygame.sprite.Group()
 
-    def _enter_room(self, room):
-        self.current_room = room
-        if not (self.current_room.type == 'boss' and self.current_room.is_cleared):
-            self.exit_portal_button = None
-        print(f"进入房间 ({room.x}, {room.y}), 类型: {room.type}")
-
-        # --- 核心改动在这里 ---
-        room_type = self.current_room.type
-        is_cleared = self.current_room.is_cleared
-
-        # 只有未清理过的特殊房间才会触发一次性事件
-        if not is_cleared:
-            if room_type == "event":
-                from .event_screen import EventScreen
-                event_id = random.choice(list(self.game.event_data.keys()))
-                self.game.state_stack.append(EventScreen(self.game, event_id, self.current_room))
-            elif room_type == "shop":
-                from .shop_screen import ShopScreen
-                self.game.state_stack.append(ShopScreen(self.game, self.current_room))
-            
-            # --- 新增的分支 ---
-            elif room_type == "rest":
-                from .rest_screen import RestScreen # 导入我们刚创建的休息界面
-                # 弹出休息界面，并把当前房间信息传过去
-                self.game.state_stack.append(RestScreen(self.game, self.current_room))
-
-        self._sync_sprites()
-        self.door_rects = self._generate_doors()
-
-    def _generate_doors(self):
-        if not self.current_room.is_cleared: return {}
-        doors = {}; door_size, margin = 60, 10
-        if self.current_room.doors["N"]: doors["N"] = pygame.Rect(SCREEN_WIDTH/2 - door_size/2, 0, door_size, margin)
-        if self.current_room.doors["S"]: doors["S"] = pygame.Rect(SCREEN_WIDTH/2 - door_size/2, SCREEN_HEIGHT - margin, door_size, margin)
-        if self.current_room.doors["W"]: doors["W"] = pygame.Rect(0, SCREEN_HEIGHT/2 - door_size/2, margin, door_size)
-        if self.current_room.doors["E"]: doors["E"] = pygame.Rect(SCREEN_WIDTH - margin, SCREEN_HEIGHT/2 - door_size/2, margin, door_size)
-        return doors
-
-    # 用这个版本完整替换你的 handle_event 方法
-    # 文件: states/dungeon_screen.py (替换 handle_event 方法)
-    def handle_event(self, event):
-        from .backpack import BackpackScreen
-        from .talents_screen import TalentsScreen
-
-        if self.backpack_button.handle_event(event):
-            self.game.state_stack.append(BackpackScreen(self.game))
-            return
-
-        if self.talents_button.handle_event(event):
-            self.game.state_stack.append(TalentsScreen(self.game))
-            return
-
-        # --- 旧的传送门按钮点击逻辑已从这里移除 ---
-
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_b:
-                self.game.state_stack.append(BackpackScreen(self.game))
-            elif event.key == pygame.K_t:
-                self.game.state_stack.append(TalentsScreen(self.game))
-
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            pass # 这里不再需要处理宝箱点击，所以是空的
-                            
-    def _sync_sprites(self):
-        self.monster_group.empty()
-        self.chest_group.empty()
-
-        if not self.current_room.is_cleared:
-            if self.current_room.type in ["combat", "elite", "boss"]:
-                for monster_data in self.current_room.monsters:
-                    self.monster_group.add(Monster(monster_data))
-            elif self.current_room.type == "treasure":
-                self.chest_group.add(TreasureChest(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
-
-    def _open_treasure_chest(self, chest_sprite):
-        """打开宝箱，并根据当前楼层配置(JSON)生成选项 (带详细调试)"""
-        print("--- 进入 _open_treasure_chest 方法 ---")
+        # 1. 生成地牢的静态部分（墙壁、地板、门）
+        self.all_sprites, self.wall_sprites, self.door_sprites, self.logical_rooms, self.start_room = \
+            dungeon_generator.generate_new_dungeon_floor(num_rooms=10, floor_data=self.current_floor_data, impassable_group_for_doors=self.impassable_sprites)
         
-        # 检查点 A: 检查楼层数据是否存在
-        if not self.current_floor_data or "treasure_loot" not in self.current_floor_data:
-            print(">>> 错误：在dungeon_data.json中未找到当前楼层的 treasure_loot 配置！")
-            return
+        self.impassable_sprites.add(self.wall_sprites)
 
-        loot_config = self.current_floor_data["treasure_loot"]
-        rarity_weights = loot_config.get("rarity_weights", {"common": 100})
-        item_count = loot_config.get("item_count", 2)
-        print(f"使用配置: {item_count}个物品, 掉落率: {rarity_weights}")
-
-        # --- 物品生成逻辑 (不变) ---
-        item_pool = {rarity: [] for rarity in rarity_weights.keys()}
-        all_item_classes = [getattr(Equips, name) for name in dir(Equips) if isinstance(getattr(Equips, name), type) and issubclass(getattr(Equips, name), Equips.Equipment) and getattr(Equips, name) is not Equips.Equipment]
-        for item_class in all_item_classes:
-            temp_item = item_class()
-            if hasattr(temp_item, 'rarity') and temp_item.rarity in item_pool:
-                item_pool[temp_item.rarity].append(item_class)
+        # 2. 初始化玩家
+        start_pos = self.start_room.world_rect.center
+        self.player_sprite = Player(start_pos[0], start_pos[1])
+        self.all_sprites.add(self.player_sprite)
         
-        rarities_to_spawn = random.choices(list(rarity_weights.keys()), weights=list(rarity_weights.values()), k=item_count)
-        choices = []
-        for rarity in rarities_to_spawn:
-            if item_pool.get(rarity):
-                item_class = random.choice(item_pool[rarity])
-                choices.append(item_class())
+        # 3. 初始化摄像机
+        self.camera = Camera(DUNGEON_VIEW_WIDTH, DUNGEON_VIEW_HEIGHT)
         
-        # 检查点 B: 检查是否成功生成了物品
-        print(f"成功生成了 {len(choices)} 个物品选项。")
-
-        if not choices:
-            print(">>> 错误: 未能生成任何物品！方法提前退出。")
-            self.current_room.is_cleared = True
-            self.door_rects = self._generate_doors()
-            chest_sprite.kill()
-            return
-
-        # 检查点 C: 准备弹出选择界面
-        print(f"准备弹出选择界面，物品为: {[getattr(c, 'display_name', '未知') for c in choices]}")
-        from .choice_screen import ChoiceScreen
-        self.game.state_stack.append(ChoiceScreen(self.game, choices, self.current_room))
+        # 4. 初始化空的动态精灵组
+        self.monster_sprites = pygame.sprite.Group()
+        self.treasure_sprites = pygame.sprite.Group()
+        self.portal_sprites = pygame.sprite.Group()
         
-        # 检查点 D: 确认界面已弹出
-        print(">>> 选择界面已弹出到状态栈。 killing chest...")
-        
-        chest_sprite.kill()
-
-    def on_monster_defeated(self, defeated_monster_uid):
-        self.current_room.monsters = [m for m in self.current_room.monsters if m['uid'] != defeated_monster_uid]
-        self._sync_sprites()
-        if not self.current_room.monsters:
-            self.current_room.is_cleared = True
-            self.door_rects = self._generate_doors()
-            if self.current_room.type == "boss":
-                # 不再创建按钮，而是创建传送门精灵并添加到组里
-                self.portal_group.add(PortalSprite(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
+        ### --- 核心修改：在这里一次性生成本层所有的动态内容 --- ###
+        print("正在预生成本层所有房间内容...")
+        for room in self.logical_rooms:
+            if not room.is_cleared:
+                # 为每个未清空的房间生成怪物
+                for m_data in room.monsters:
+                    self.monster_sprites.add(Monster(m_data, room.world_rect))
                 
-    # 文件: states/dungeon_screen.py (替换 update 方法)
-    def update(self):
-        self.player_group.update()
+                # 如果是宝藏房，生成宝箱
+                if room.type == "treasure":
+                    self.treasure_sprites.add(TreasureChest(*room.world_rect.center))
+            
+            # 如果是Boss房，生成传送门
+            elif room.type == "boss":
+                self.portal_sprites.add(PortalSprite(*room.world_rect.center))
+        
+        # 将所有新生成的动态精灵一次性加入总绘制组
+        self.all_sprites.add(self.monster_sprites, self.treasure_sprites, self.portal_sprites)
+        print("内容生成完毕！")
+        
+        # 5. 初始化状态和UI
+        self.is_returning = False
+        self.current_room = self.start_room
+        self.pending_lockdown_room = None
+        self.minimap_glow = 0.0
+        self._create_ui_buttons()
+        
+        # 6. 手动触发一次“进入起始房间”的逻辑（现在只负责关门和特殊事件）
+        self._on_enter_room(self.start_room)
 
+    def _on_enter_room(self, new_room):
+        """当玩家进入一个新房间时触发。"""
+        self.current_room = new_room
+        print(f"进入房间: {new_room.x}, {new_room.y}, 类型: {new_room.type}")
+        
+        ### --- 核心修改：此函数不再负责生成精灵 --- ###
+        # self._populate_room_sprites() # <--- 已删除
+
+        # 关门和处理特殊房间的逻辑保持不变
+        if not new_room.is_cleared and not new_room.is_corridor and new_room.type in ["combat", "elite", "boss"]:
+            self.pending_lockdown_room = new_room
+        
+        self._handle_special_room_entry()
+        
+    # ... (其他所有函数，如 update, draw, on_monster_defeated 等，都保持不变) ...
+    def handle_event(self, event):
+        if self.is_returning: return
+        for button_name, button in self.ui_buttons.items():
+            if button.handle_event(event): self._handle_ui_button_action(button_name); return
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_b: self._handle_ui_button_action("backpack")
+            elif event.key == pygame.K_t: self._handle_ui_button_action("talents")
+            elif event.key == pygame.K_c: self._handle_ui_button_action("attributes")
+            elif event.key == pygame.K_ESCAPE: self._handle_ui_button_action("exit")
+    def update(self):
+        if self.is_returning:
+            self.player_sprite.rect.x += 1 
+            self.is_returning = False
+            
+        # 计算时间增量 dt_sec
+        current_time = pygame.time.get_ticks()
+        if not hasattr(self, '_last_update_time'): self._last_update_time = current_time
+        dt_ms = current_time - self._last_update_time
+        self._last_update_time = current_time
+        dt_sec = dt_ms / 1000.0
+
+        self.player_sprite.update(self.impassable_sprites)
+        self.camera.update(self.player_sprite)
+        self.monster_sprites.update(self.wall_sprites, dt_sec)
+        
+        self._check_current_room()
+        if self.pending_lockdown_room:
+            self._check_and_trigger_lockdown()
+        self._check_interactions()
+        self._update_animations(dt_sec)
+    def draw(self, surface):
+        surface.fill((10, 15, 25))
+        view_surf = surface.subsurface(pygame.Rect(DUNGEON_VIEW_X, DUNGEON_VIEW_Y, DUNGEON_VIEW_WIDTH, DUNGEON_VIEW_HEIGHT))
+        view_surf.fill((10, 15, 25))
+        for sprite in self.all_sprites: view_surf.blit(sprite.image, self.camera.apply(sprite.rect))
+        self._draw_ui_panel(surface)
+    def _check_current_room(self):
+        colliding_rooms = [r for r in self.logical_rooms if r.world_rect.colliderect(self.player_sprite.rect)]
+        if colliding_rooms and colliding_rooms[0] is not self.current_room: self._on_enter_room(colliding_rooms[0])
+    def _check_and_trigger_lockdown(self):
+        room_doors = [d for d in self.door_sprites if self.pending_lockdown_room.world_rect.collidepoint(d.rect.center)]
+        is_player_clear_of_doors = not any(self.player_sprite.rect.colliderect(d.rect) for d in room_doors)
+        if is_player_clear_of_doors:
+            print(f"玩家已进入房间 {self.pending_lockdown_room.x}, {self.pending_lockdown_room.y}，正在关门...")
+            for door in room_doors: door.close()
+            self.pending_lockdown_room = None
+    def on_monster_defeated(self, monster_uid):
+        self.current_room.monsters = [m for m in self.current_room.monsters if m['uid'] != monster_uid]
+        for monster in self.monster_sprites:
+            if monster.uid == monster_uid: monster.kill()
+        if not self.current_room.monsters and self.current_room.type in ["combat", "elite", "boss"]:
+            self.current_room.is_cleared = True
+            print(f"房间 {self.current_room.x}, {self.current_room.y} 已清空! 正在开门...")
+            for door in self.door_sprites:
+                if self.current_room.world_rect.collidepoint(door.rect.center): door.open()
+    def _check_interactions(self):
         if not self.current_room.is_cleared:
-            # 检查与怪物的碰撞
-            collided_monster = pygame.sprite.spritecollideany(self.player, self.monster_group)
+            collided_monster = pygame.sprite.spritecollideany(self.player_sprite, self.monster_sprites)
             if collided_monster:
                 from .combat import CombatScreen
-                self.game.state_stack.append(CombatScreen(self.game, collided_monster.enemy_id, collided_monster.uid))
-                self.monster_group.empty()
-                return
-
-            # 检查与宝箱的碰撞
-            collided_chest = pygame.sprite.spritecollideany(self.player, self.chest_group)
-            if collided_chest:
-                self._open_treasure_chest(collided_chest)
-                return
-
-        else: # 房间已清理
-            # --- 核心修改在这里 ---
-            # 检查与传送门的碰撞
-            collided_portal = pygame.sprite.spritecollideany(self.player, self.portal_group)
-            if collided_portal:
-                print("进入下一层！")
-                next_floor_number = self.floor_number + 1
-                self.game.state_stack.pop()
-                self.game.state_stack.append(DungeonScreen(self.game, self.dungeon_id, next_floor_number))
-                return
-            # --- 修改结束 ---
-
-            # 检查与门的碰撞
-            for direction, door_rect in self.door_rects.items():
-                if self.player.rect.colliderect(door_rect):
-                    self._change_room(direction)
-                    break
-                
-    def _change_room(self, direction):
-        x, y = self.current_room.x, self.current_room.y; next_room_coord = None
-        if direction == "N": next_room_coord = (x, y - 1)
-        if direction == "S": next_room_coord = (x, y + 1)
-        if direction == "W": next_room_coord = (x - 1, y)
-        if direction == "E": next_room_coord = (x + 1, y)
-        if next_room_coord in self.floor.rooms:
-            next_room = self.floor.rooms[next_room_coord]; self._enter_room(next_room)
-            if direction == "N": self.player.rect.bottom = SCREEN_HEIGHT - 15
-            if direction == "S": self.player.rect.top = 15
-            if direction == "W": self.player.rect.right = SCREEN_WIDTH - 15
-            if direction == "E": self.player.rect.left = 15
-
-    # 文件: states/dungeon_screen.py (替换 draw 方法)
-    def draw(self, surface):
-        surface.fill(BG_COLOR)
-        for door_rect in self.door_rects.values(): pygame.draw.rect(surface, (100, 200, 100), door_rect)
-
-        # if self.exit_portal_button: self.exit_portal_button.draw(surface) <-- 删除这行
-        self.portal_group.draw(surface) # <-- 新增这行，绘制传送门精灵
-
-        self.monster_group.draw(surface)
-        self.chest_group.draw(surface)
-        self.player_group.draw(surface)
-        self._draw_minimap(surface)
-        self.backpack_button.draw(surface)
-        self.talents_button.draw(surface)
-        
-    def _draw_minimap(self, surface):
-        minimap_rect = pygame.Rect(10, 10, 230, 230)
-        pygame.draw.rect(surface, PANEL_BG_COLOR, minimap_rect); pygame.draw.rect(surface, PANEL_BORDER_COLOR, minimap_rect, 2)
-        cell_size = 15
-        for (x, y), room in self.floor.rooms.items():
-            map_x, map_y = minimap_rect.x + x*cell_size + 5, minimap_rect.y + y*cell_size + 5
-            cell_rect = pygame.Rect(map_x, map_y, cell_size - 1, cell_size - 1)
-            base_color = NODE_STYLE.get(room.type, {"color": (255,255,255)})["color"]
-            final_color = base_color
-            if not room.is_cleared and room.type != "start":
-                final_color = (base_color[0] // 2, base_color[1] // 2, base_color[2] // 2)
-            pygame.draw.rect(surface, final_color, cell_rect)
-            if room is self.current_room:
-                p1 = (cell_rect.centerx, cell_rect.top + 3); p2 = (cell_rect.left + 3, cell_rect.bottom - 3); p3 = (cell_rect.right - 3, cell_rect.bottom - 3)
-                pygame.draw.polygon(surface, (255, 255, 255, 200), [p1, p2, p3])
+                self.game.state_stack.append(CombatScreen(self.game, collided_monster.enemy_id, collided_monster.uid)); self.is_returning = True; return
+            collided_treasure = pygame.sprite.spritecollideany(self.player_sprite, self.treasure_sprites)
+            if collided_treasure: self._open_treasure_chest(collided_treasure)
+    def _get_font(self, font_name, default_size=20):
+        try: return self.game.fonts[font_name]
+        except (AttributeError, KeyError): return pygame.font.Font(None, default_size)
+    def _create_ui_buttons(self):
+        self.ui_buttons = {}; button_w, button_h = 100, 40; padding = 10
+        configs = [("backpack", "背包 B", (59, 130, 246)), ("talents", "天赋 T", (139, 92, 246)),
+                   ("attributes", "属性 C", (255, 100, 100)), ("exit", "退出", (200, 80, 80))]
+        start_y = BUTTON_AREA_UI_Y + padding
+        for i, (key, text, color) in enumerate(configs):
+            rect = pygame.Rect(BUTTON_AREA_UI_X + (UI_PANEL_WIDTH - button_w) // 2, start_y + i * (button_h + padding), button_w, button_h)
+            self.ui_buttons[key] = ModernStoryButton(rect, text, self._get_font('small'), color)
+    def _handle_ui_button_action(self, action):
+        from .backpack import BackpackScreen; from .talents_screen import TalentsScreen
+        from .attributes_screen import AttributesScreen; from .title import TitleScreen
+        if action == "backpack": self.game.state_stack.append(BackpackScreen(self.game))
+        elif action == "talents": self.game.state_stack.append(TalentsScreen(self.game))
+        elif action == "attributes": self.game.state_stack.append(AttributesScreen(self.game))
+        elif action == "exit": self.game.state_stack = [TitleScreen(self.game)]
+        self.is_returning = True
+    def _handle_special_room_entry(self):
+        if self.current_room.is_cleared: return
+        room_type = self.current_room.type; sub_screen_opened = False
+        if room_type == "event":
+            from .event_screen import EventScreen
+            if self.game.event_data:
+                event_id = random.choice(list(self.game.event_data.keys()))
+                self.game.state_stack.append(EventScreen(self.game, event_id, self.current_room)); sub_screen_opened = True
+        elif room_type == "shop":
+            from .shop_screen import ShopScreen
+            self.game.state_stack.append(ShopScreen(self.game, self.current_room)); sub_screen_opened = True
+        elif room_type == "rest":
+            from .rest_screen import RestScreen
+            self.game.state_stack.append(RestScreen(self.game, self.current_room)); sub_screen_opened = True
+        if sub_screen_opened: self.is_returning = True
+    def _open_treasure_chest(self, chest_sprite):
+        loot_config = self.current_floor_data.get("treasure_loot", {}); item_count = loot_config.get("item_count", 2)
+        all_items = [cls for name, cls in inspect.getmembers(Equips, inspect.isclass) if issubclass(cls, Equips.Equipment) and cls is not Equips.Equipment and cls is not Equips.DragonHeart]
+        if all_items:
+            choices = [random.choice(all_items)() for _ in range(item_count)]
+            from .choice_screen import ChoiceScreen
+            self.game.state_stack.append(ChoiceScreen(self.game, choices, self.current_room)); self.is_returning = True
+        chest_sprite.kill()
+    def _update_animations(self, dt):
+        self.minimap_glow = (self.minimap_glow + dt * 3) % (2 * math.pi)
+    def _draw_ui_panel(self, surface):
+        pygame.draw.rect(surface, (20, 25, 40), (0, 0, UI_PANEL_WIDTH, SCREEN_HEIGHT))
+        pygame.draw.line(surface, (50, 60, 80), (UI_PANEL_WIDTH, 0), (UI_PANEL_WIDTH, SCREEN_HEIGHT), 2)
+        self._draw_modern_minimap(surface); self._draw_player_info_panel(surface)
+        for button in self.ui_buttons.values(): button.draw(surface, 0)
+    def _draw_modern_minimap(self, surface):
+        minimap_rect = pygame.Rect(MINIMAP_UI_X + 10, MINIMAP_UI_Y + 10, MINIMAP_UI_WIDTH - 20, MINIMAP_UI_HEIGHT - 20)
+        pygame.draw.rect(surface, (20, 25, 40, 220), minimap_rect, border_radius=12)
+        glow_intensity = int((math.sin(self.minimap_glow) + 1) * 20 + 30)
+        pygame.draw.rect(surface, (70, 80, 100, glow_intensity), minimap_rect, width=3, border_radius=12)
+        title_font = self._get_font('small', 16)
+        title_text = title_font.render(f"第{self.floor_number}层 - {self.dungeon_data.get('name', '未知地牢')}", True, (255, 215, 0))
+        surface.blit(title_text, (minimap_rect.x + 10, minimap_rect.y + 5))
+        grid_rect = pygame.Rect(minimap_rect.x + 10, minimap_rect.y + 30, minimap_rect.width - 20, minimap_rect.height - 40 - 20)
+        cell_size = 18; spacing = 4; padded_cell_size = cell_size + spacing
+        map_center_x, map_center_y = grid_rect.center
+        center_cell_base_x, center_cell_base_y = map_center_x - cell_size // 2, map_center_y - cell_size // 2
+        rooms_to_draw = [r for r in self.logical_rooms if not r.is_corridor]
+        for room in rooms_to_draw:
+            rel_x, rel_y = (room.x - self.current_room.x) // 2, (room.y - self.current_room.y) // 2
+            draw_x, draw_y = center_cell_base_x + rel_x * padded_cell_size, center_cell_base_y + rel_y * padded_cell_size
+            cell_rect = pygame.Rect(draw_x, draw_y, cell_size, cell_size)
+            if not grid_rect.colliderect(cell_rect): continue
+            base_color = NODE_STYLE.get(room.type, {"color": (255, 255, 255)})["color"]
+            is_cleared = room.is_cleared or room.type == "start"
+            alpha = 255 if is_cleared else 150
+            final_color = base_color if is_cleared else tuple(c // 2 for c in base_color)
+            pygame.draw.rect(surface, (*final_color, alpha), cell_rect, border_radius=3)
+            if room is self.current_room: pygame.draw.rect(surface, (255, 255, 255), cell_rect, 2, border_radius=4)
+        legend_y = minimap_rect.bottom - 25; legend_font = self._get_font('small', 12)
+        room_name = NODE_STYLE.get(self.current_room.type, {"name": "未知"})["name"]
+        legend_text = f"当前: {room_name}房间"
+        surface.blit(legend_font.render(legend_text, True, (200, 200, 200)), (minimap_rect.x + 10, legend_y))
+    def _draw_player_info_panel(self, surface):
+        panel_rect = pygame.Rect(PLAYER_INFO_UI_X + 10, PLAYER_INFO_UI_Y + 10, PLAYER_INFO_UI_WIDTH - 20, PLAYER_INFO_UI_HEIGHT - 20)
+        pygame.draw.rect(surface, (20, 25, 40, 220), panel_rect, border_radius=12)
+        pygame.draw.rect(surface, (70, 80, 100), panel_rect, width=3, border_radius=12)
+        font_small = self._get_font('small'); font_normal = self._get_font('normal')
+        player = self.game.player
+        draw_text(surface, f"Lv.{player.level} {player.name}", font_normal, TEXT_COLOR, (panel_rect.x + 10, panel_rect.y + 10))
+        draw_text(surface, f"HP: {int(player.hp)}/{player.max_hp}", font_small, (255, 100, 100), (panel_rect.x + 10, panel_rect.y + 40))
+        pygame.draw.rect(surface, (50, 50, 50), (panel_rect.x + 10, panel_rect.y + 60, panel_rect.width - 30, 10), border_radius=5)
+        hp_bar_width = (panel_rect.width - 30) * (player.hp / player.max_hp) if player.max_hp > 0 else 0
+        pygame.draw.rect(surface, (200, 50, 50), (panel_rect.x + 10, panel_rect.y + 60, hp_bar_width, 10), border_radius=5)
+        draw_text(surface, f"EXP: {player.exp}/{player.exp_to_next_level}", font_small, (100, 255, 100), (panel_rect.x + 10, panel_rect.y + 75))
+        pygame.draw.rect(surface, (50, 50, 50), (panel_rect.x + 10, panel_rect.y + 95, panel_rect.width - 30, 10), border_radius=5)
+        exp_bar_width = (panel_rect.width - 30) * (player.exp / player.exp_to_next_level) if player.exp_to_next_level > 0 else 0
+        pygame.draw.rect(surface, (50, 200, 50), (panel_rect.x + 10, panel_rect.y + 95, exp_bar_width, 10), border_radius=5)
+        draw_text(surface, f"攻击: {int(player.attack)}", font_small, TEXT_COLOR, (panel_rect.x + 10, panel_rect.y + 110))
+        draw_text(surface, f"防御: {int(player.defense)}", font_small, TEXT_COLOR, (panel_rect.x + 150, panel_rect.y + 110))
+        draw_text(surface, f"金币: {player.gold}", font_small, (255, 215, 0), (panel_rect.x + 10, panel_rect.y + 130))

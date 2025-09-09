@@ -108,6 +108,7 @@ class EventScreen(BaseState):
             
         self.view_mode = 'showing_result'
 
+    # states/event_screen.py (替换这个函数)
     def _leave_event(self):
         """离开事件，更新地图并关闭界面"""
         from .dungeon_screen import DungeonScreen
@@ -115,8 +116,10 @@ class EventScreen(BaseState):
         if len(self.game.state_stack) > 1:
             prev_state = self.game.state_stack[-2]
             if isinstance(prev_state, DungeonScreen):
-                prev_state.door_rects = prev_state._generate_doors()
+                # --- 核心修复：不再调用不存在的函数 ---
+                prev_state.is_returning = True
         self.game.state_stack.pop()
+
 
     def draw(self, surface):
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)

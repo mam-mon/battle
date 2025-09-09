@@ -508,6 +508,22 @@ class RuneBlade(Equipment):
         packet.damage_type = DamageType.MAGIC
 
 
+class DragonHeart(Equipment):
+    """【龙之心】(珍贵): 只要在背包中，每场战斗开始前为你恢复30%的最大生命值。"""
+    # --- 核心修改：移除 slot 属性，或设为 None ---
+    slot = None 
+
+    display_name = "龙之心"
+
+    def __init__(self):
+        self.rarity = "legendary"
+        self.type = "precious"
+
+    def on_battle_start(self, wearer):
+        heal_amount = wearer.max_hp * 0.3
+        wearer.heal(heal_amount)
+
+
 UPGRADE_MAP = {
     WoodenSword: WoodenSword_Star,
     WoodenArmor: WoodenArmor_Star,

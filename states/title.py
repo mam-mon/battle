@@ -7,7 +7,7 @@ from .base import BaseState
 from .loading import LoadScreen
 from .story import StoryScreen
 from .sandbox_screen import SandboxScreen
-from ui import Button, draw_text_with_outline
+from ui import Button, draw_text_with_emoji_fallback, draw_text_with_outline
 from settings import *
 
 class TitleScreen(BaseState):
@@ -209,8 +209,7 @@ class TitleScreen(BaseState):
                 self._draw_button(surface, button, button.rect, hover_alpha, 255)
 
     def _draw_button(self, surface, button, rect, hover_alpha, alpha):
-            """绘制单个按钮（文字带描边）"""
-            # 按钮缩放效果 (这部分不变)
+            """绘制单个按钮"""
             scale = 1.0 + hover_alpha * 0.05
             if scale != 1.0:
                 scaled_size = (int(rect.width * scale), int(rect.height * scale))
@@ -218,10 +217,8 @@ class TitleScreen(BaseState):
                 scaled_rect.center = rect.center
                 rect = scaled_rect
             
-            # 按钮背景 (这部分不变)
             bg_alpha = int((120 + hover_alpha * 60) * (alpha / 255))
             border_alpha = int((180 + hover_alpha * 75) * (alpha / 255))
-            
             base_color = getattr(button, 'accent_color', (100, 150, 200))
             bg_color = (*base_color, bg_alpha)
             border_color = (*base_color, border_alpha)
@@ -229,33 +226,29 @@ class TitleScreen(BaseState):
             pygame.draw.rect(surface, bg_color, rect, border_radius=12)
             pygame.draw.rect(surface, border_color, rect, width=3, border_radius=12)
             
-            # 悬停发光效果 (这部分不变)
             if hover_alpha > 0:
                 glow_intensity = int((math.sin(self.glow_animation) + 1) * hover_alpha * 20 + 10)
                 glow_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
-                pygame.draw.rect(glow_surface, (*base_color, glow_intensity), 
-                                (0, 0, rect.width, rect.height), border_radius=12)
+                pygame.draw.rect(glow_surface, (*base_color, glow_intensity), (0, 0, rect.width, rect.height), border_radius=12)
                 surface.blit(glow_surface, rect.topleft)
             
-            # --- 核心修改在这里 ---
-            # 按钮文字
+            ### --- 核心修复：按钮文字也使用 Emoji 安全函数 --- ###
             font = self._get_font('normal', 20)
-            text_alpha = int(255 * (alpha / 255))
-            
-            # 根据悬停状态决定文字颜色，但这次我们不直接渲染
             main_text_color = (255, 255, 255) if hover_alpha > 0.3 else (200, 200, 200)
 
-            # 使用我们强大的新函数来绘制带描边的文字！
-            draw_text_with_outline(
-                surface=surface,
-                text=button.text,
-                font=font,
-                text_color=main_text_color,  # 主要文字颜色
-                outline_color=(20, 20, 20), # 描边颜色（深灰色/黑色，形成对比）
-                pos=rect.center,
-                outline_width=2 # 按钮文字描边不需要太粗
-            )
+            # 估算位置
+            emoji_placeholders = {'🎮':'  ', '📖':'  ', '💾':'  ', '⚔️':'  '}
+            text_to_measure = button.text
+            for emoji, placeholder in emoji_placeholders.items():
+                text_to_measure = text_to_measure.replace(emoji, placeholder)
+
+            estimated_surf = font.render(text_to_measure, True, (0,0,0))
+            estimated_rect = estimated_surf.get_rect(center=rect.center)
             
+            # 安全绘制 (注意：这会失去描边效果，但能确保Emoji正确显示)
+            draw_text_with_emoji_fallback(surface, button.text, estimated_rect.topleft, TEXT_COLOR)
+
+
 class ModernButton:
     def __init__(self, rect, text, font, accent_color=(100, 150, 200)):
         if isinstance(rect, tuple):

@@ -111,20 +111,34 @@ class RestScreen(BaseState):
         # --- 处理离开按钮 (不变) ---
         if self.leave_button.handle_event(event):
             self._leave_room()
-            
+
     def _leave_room(self):
         """处理离开休息室的逻辑"""
         from .dungeon_screen import DungeonScreen
-        # 标记这个房间为“已探索完毕”
         self.origin_room.is_cleared = True
-        
-        # 更新地牢界面，让出口的门显示出来
+
+        # Check the state below this one on the stack
         if len(self.game.state_stack) > 1:
             prev_state = self.game.state_stack[-2]
             if isinstance(prev_state, DungeonScreen):
-                prev_state.door_rects = prev_state._generate_doors()
+                # Correctly notify the DungeonScreen that we are returning
+                prev_state.is_returning = True
+
+        # Pop the current state (this RestScreen) off the stack
+        self.game.state_stack.pop()
         
-        # 将自己从状态栈中弹出，返回地牢界面
+    def _leave_room(self):
+        """处理离开休息室的逻辑"""
+        from .dungeon_screen import DungeonScreen
+        self.origin_room.is_cleared = True
+
+        if len(self.game.state_stack) > 1:
+            prev_state = self.game.state_stack[-2]
+            if isinstance(prev_state, DungeonScreen):
+                # --- 核心修复：通知地牢界面 ---
+                prev_state.is_returning = True
+                prev_state.door_rects = prev_state._generate_doors()
+
         self.game.state_stack.pop()
 
     def draw(self, surface):

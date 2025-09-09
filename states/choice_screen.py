@@ -89,12 +89,12 @@ class ChoiceScreen(BaseState):
                 
                 self.origin_room.is_cleared = True
                 
-                # 更新地牢界面
                 from .dungeon_screen import DungeonScreen
                 if len(self.game.state_stack) > 1:
                     prev_state = self.game.state_stack[-2]
                     if isinstance(prev_state, DungeonScreen):
-                        prev_state.door_rects = prev_state._generate_doors()
+                        # --- 核心修复：不再调用不存在的函数 ---
+                        prev_state.is_returning = True
                 
                 # 退出当前界面
                 self.game.state_stack.pop() 

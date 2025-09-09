@@ -31,7 +31,6 @@ ENEMY_PANEL_RECT = pygame.Rect(SCREEN_WIDTH - 550, 50, 500, 250)
 BATTLE_LOG_RECT = pygame.Rect(50, 50, SCREEN_WIDTH - 650, 350)
 PLAYER_ACTION_PANEL_RECT = pygame.Rect(PLAYER_PANEL_RECT.right + 20, PLAYER_PANEL_RECT.top, 200, PLAYER_PANEL_RECT.height)
 
-
 # --- 物品品质颜色 ---
 RARITY_COLORS = {
     "common":    (255, 255, 255),  # 白色
@@ -44,10 +43,10 @@ RARITY_COLORS = {
 
 # --- 玩家角色配置 ---
 PLAYER_BASE_STATS = {
-    "hp": 100,
+    "hp": 50,
     "defense": 3,
     "magic_resist": 3,
-    "attack": 10,
+    "attack": 1000,
     "attack_speed": 1.2,
 }
 
@@ -73,3 +72,64 @@ DAMAGE_TYPE_NAMES_CN = {
 }
 # 文件: settings.py (追加)
 CRIT_COLOR = (255, 215, 0)          # 暴击文字颜色 - 金色
+
+# settings.py (在文件末尾添加)
+
+# settings.py (替换文件末尾的布局常量代码块)
+
+# --- 新的地牢界面布局常量 ---
+
+# 房间逻辑尺寸，适配新的地牢视图
+ROOM_SIZE = 700
+
+# 左侧UI面板宽度
+UI_PANEL_WIDTH = 300 
+
+# 实际地牢游戏区域（在UI面板右侧）
+DUNGEON_VIEW_X = UI_PANEL_WIDTH
+DUNGEON_VIEW_Y = 0  # <-- 补全 DUNGEON_VIEW_Y
+DUNGEON_VIEW_WIDTH = SCREEN_WIDTH - UI_PANEL_WIDTH
+DUNGEON_VIEW_HEIGHT = SCREEN_HEIGHT
+
+# 小地图在左侧UI面板内的位置和大小
+MINIMAP_UI_X = 0
+MINIMAP_UI_Y = 0
+MINIMAP_UI_WIDTH = UI_PANEL_WIDTH
+MINIMAP_UI_HEIGHT = int(SCREEN_HEIGHT * 0.45) # 占据左侧45%的高度
+
+# 角色信息面板在左侧UI面板内的位置和大小
+PLAYER_INFO_UI_X = 0
+PLAYER_INFO_UI_Y = MINIMAP_UI_HEIGHT
+PLAYER_INFO_UI_WIDTH = UI_PANEL_WIDTH
+PLAYER_INFO_UI_HEIGHT = int(SCREEN_HEIGHT * 0.25) # 占据左侧25%的高度
+
+# 快捷按钮区域在左侧UI面板内的位置和大小
+BUTTON_AREA_UI_X = 0
+BUTTON_AREA_UI_Y = MINIMAP_UI_HEIGHT + PLAYER_INFO_UI_HEIGHT
+BUTTON_AREA_UI_WIDTH = UI_PANEL_WIDTH
+BUTTON_AREA_UI_HEIGHT = SCREEN_HEIGHT - BUTTON_AREA_UI_Y
+# --- 布局常量结束 ---
+
+# settings.py (追加到文件末尾)
+
+# --- 新增：淬炼结晶系统常量 ---
+
+# 1. 重复装备时，根据品质获得的淬炼结晶数量
+CRYSTALS_PER_RARITY = {
+    "common":    1,
+    "uncommon":  2,
+    "rare":      5,
+    "epic":      10,
+    "legendary": 25,
+    "mythic":    50
+}
+
+# 2. 在背包中升级装备时，根据品质消耗的淬炼结晶数量
+UPGRADE_COST_PER_RARITY = {
+    "common":    10,
+    "uncommon":  25,
+    "rare":      50,
+    "epic":      100,
+    "legendary": 200,
+    # 神话(mythic)品质通常是最高级，所以默认无法再升级
+}

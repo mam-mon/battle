@@ -303,6 +303,11 @@ def draw_text(surface, text, font, color, rect, aa=True, return_cursor_pos=False
     """
     绘制自动换行的文本，并可选择性地返回最后一个字符后的光标位置。
     """
+    if not isinstance(rect, pygame.Rect):
+        # 如果不是 Rect 对象, 假定它是一个 (x, y) 坐标，并创建一个临时的 Rect
+        temp_rect = pygame.Rect(rect[0], rect[1], surface.get_width() - rect[0], font.get_height())
+        rect = temp_rect
+
     y = rect.top
     line_spacing = -2
     font_height = font.size("Tg")[1]
@@ -408,48 +413,123 @@ def prepare_fallback_fonts(default_font):
         print("警告: 未找到 'Segoe UI Emoji' 字体，Emoji 可能无法正常显示。")
         EMOJI_FONT = default_font # 如果找不到，就用回默认字体，避免崩溃
 
+# ui.py (完整替换这个函数)
+
+# ui.py (完整替换这个函数)
+
+# ui.py (完整替换这个函数)
+
+# 文件: ui.py (用这个版本完整替换旧的 draw_text_with_emoji_fallback 函数)
+
 def draw_text_with_emoji_fallback(surface, text, pos, color):
     """
-    使用字体回退机制，绘制同时包含普通文本和 Emoji 的字符串。
+    一个极其稳健的、用于绘制包含 Emoji 文本的最终函数。(已修复)
     """
-    if not DEFAULT_FONT_FOR_FALLBACK or not EMOJI_FONT:
-        # 如果字体没准备好，就用最简单的方式绘制，防止出错
-        fallback_surf = pygame.font.Font(None, 20).render(text, True, color)
-        surface.blit(fallback_surf, pos)
+    # 最终安全检查：如果文本为空或仅包含空格，则不执行任何操作
+    if not text or text.isspace():
         return
 
-    x_offset = pos[0]
-    y_offset = pos[1]
-    
+    if not DEFAULT_FONT_FOR_FALLBACK or not EMOJI_FONT:
+        try:
+            fallback_surf = pygame.font.Font(None, 20).render(text, True, color)
+            surface.blit(fallback_surf, pos)
+        except pygame.error:
+            pass # 如果连最基本的渲染都失败了，就什么也不做
+        return
+
+    x_offset, y_offset = pos
     current_text_segment = ""
     current_font_is_emoji = False
 
-    # 逐个字符检查
+    # 这是一个辅助函数，用来安全地渲染文本片段
+    def render_segment(segment, font, segment_color):
+        nonlocal x_offset
+        # 核心修复 1: 在渲染前再次检查片段是否为空或只有空格
+        if not segment or segment.isspace():
+            return
+        try:
+            # 核心修复 2: 使用 try-except 包裹 render 调用
+            rendered_surface = font.render(segment, True, segment_color)
+            surface.blit(rendered_surface, (x_offset, y_offset))
+            x_offset += rendered_surface.get_width()
+        except pygame.error as e:
+            # 如果渲染失败 (比如 "zero width" 错误)，就打印一个警告并跳过，而不是让游戏崩溃
+            #print(f"警告: 渲染文本片段 '{segment}' 失败: {e}")
+            pass
+
     for char in text:
+        if char.isspace():
+            if current_text_segment:
+                font_to_use = EMOJI_FONT if current_font_is_emoji else DEFAULT_FONT_FOR_FALLBACK
+                render_segment(current_text_segment, font_to_use, color)
+                current_text_segment = ""
+            
+            # 单独渲染空格
+            render_segment(' ', DEFAULT_FONT_FOR_FALLBACK, color)
+            continue
+
         is_emoji = char in emoji.EMOJI_DATA
-        
-        # 如果是第一个字符，初始化状态
         if not current_text_segment:
             current_text_segment += char
             current_font_is_emoji = is_emoji
             continue
 
-        # 如果字符类型没变，就继续添加到当前段落
         if is_emoji == current_font_is_emoji:
             current_text_segment += char
         else:
-            # 字符类型变化了！渲染并清空上一段
-            font_to_use = EMOJI_FONT if current_font_is_emoji else DEFAULT_FONT_FOR_FALLBACK
-            rendered_segment = font_to_use.render(current_text_segment, True, color)
-            surface.blit(rendered_segment, (x_offset, y_offset))
-            x_offset += rendered_segment.get_width()
+            if current_text_segment:
+                font_to_use = EMOJI_FONT if current_font_is_emoji else DEFAULT_FONT_FOR_FALLBACK
+                render_segment(current_text_segment, font_to_use, color)
             
-            # 开始新的一段
             current_text_segment = char
             current_font_is_emoji = is_emoji
 
-    # 渲染最后剩下的一段
     if current_text_segment:
         font_to_use = EMOJI_FONT if current_font_is_emoji else DEFAULT_FONT_FOR_FALLBACK
-        rendered_segment = font_to_use.render(current_text_segment, True, color)
-        surface.blit(rendered_segment, (x_offset, y_offset))
+        render_segment(current_text_segment, font_to_use, color)
+
+class ModernStoryButton:
+    """一个带有颜色和动画支持的现代化按钮"""
+    def __init__(self, rect, text, font, accent_color=(100, 150, 200)):
+        if isinstance(rect, tuple):
+            self.rect = pygame.Rect(*rect)
+        else:
+            self.rect = rect
+        self.text = text
+        self.font = font
+        self.accent_color = accent_color
+    
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            return self.rect.collidepoint(event.pos)
+        return False
+
+    def draw(self, surface, hover_alpha):
+        """
+        根据 hover_alpha (0.0 到 1.0) 动态绘制按钮。
+        hover_alpha 由 StoryScreen 的 update 函数计算和传入。
+        """
+        # 根据悬停程度进行缩放
+        scale = 1.0 + hover_alpha * 0.05
+        if scale != 1.0:
+            scaled_size = (int(self.rect.width * scale), int(self.rect.height * scale))
+            draw_rect = pygame.Rect(0, 0, *scaled_size)
+            draw_rect.center = self.rect.center
+        else:
+            draw_rect = self.rect
+
+        # 根据悬停程度调整颜色和透明度
+        bg_alpha = int(120 + hover_alpha * 60)
+        border_alpha = int(180 + hover_alpha * 75)
+        
+        bg_color = (*self.accent_color, bg_alpha)
+        border_color = (*self.accent_color, border_alpha)
+        
+        pygame.draw.rect(surface, bg_color, draw_rect, border_radius=10)
+        pygame.draw.rect(surface, border_color, draw_rect, width=2, border_radius=10)
+        
+        # 文字
+        text_color = (255, 255, 255) if hover_alpha > 0.3 else (200, 200, 200)
+        text_surface = self.font.render(self.text, True, text_color)
+        text_rect = text_surface.get_rect(center=draw_rect.center)
+        surface.blit(text_surface, text_rect)
